@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Schematized Argument Builder</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #f8f7f4; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+    input:focus { outline: none; }
+    button:focus { outline: none; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useRef } = React;
+
+    function uid() { return Math.random().toString(36).slice(2, 10); }
+    function letterLabel(i) { return String.fromCharCode(97 + i); }
+
+    function DragHandle() {
+      return (
+        <div style={{ display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"8px 4px",color:"#bbbbc8",flexShrink:0,cursor:"grab",userSelect:"none" }}>
+          <svg width="12" height="18" viewBox="0 0 12 18" fill="currentColor">
+            <circle cx="3" cy="3" r="1.5"/><circle cx="9" cy="3" r="1.5"/>
+            <circle cx="3" cy="9" r="1.5"/><circle cx="9" cy="9" r="1.5"/>
+            <circle cx="3" cy="15" r="1.5"/><circle cx="9" cy="15" r="1.5"/>
+          </svg>
+        </div>
+      );
+    }
+
+    function AddBtn({onClick,label}) {
+      return (
+        <button onClick={onClick} style={{display:"flex",alignItems:"center",gap:6,marginTop:8,padding:"8px 14px",background:"none",border:"1px dashed #d0cfdc",borderRadius:8,color:"#8b8ba0",fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}
+          onMouseEnter={e=>{e.currentTarget.style.borderColor="#6c63ff";e.currentTarget.style.color="#6c63ff"}}
+          onMouseLeave={e=>{e.currentTarget.style.borderColor="#d0cfdc";e.currentTarget.style.color="#8b8ba0"}}>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg>
+          {label}
+        </button>
+      );
+    }
+
+    function ActBtns({copied,onCopy,onDownload,onClear,disabled}) {
+      return (
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <button onClick={onCopy} disabled={disabled} style={{display:"flex",alignItems:"center",gap:6,padding:"10px 18px",background:copied?"#22c55e":"#6c63ff",color:"#fff",border:"none",borderRadius:8,fontSize:14,fontWeight:600,cursor:disabled?"not-allowed":"pointer",opacity:disabled?0.4:1,fontFamily:"inherit",transition:"all 0.2s"}}>
+            {copied ? (<><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3,9 6,12 13,4"/></svg>Copied!</>) : (<><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1.5 1.5 0 0 1 1.5-1.5H11"/></svg>Copy to Clipboard</>)}
+          </button>
+          <button onClick={onDownload} disabled={disabled} style={{display:"flex",alignItems:"center",gap:6,padding:"10px 18px",background:"#fff",color:"#1a1a2e",border:"1px solid #d0cfdc",borderRadius:8,fontSize:14,fontWeight:600,cursor:disabled?"not-allowed":"pointer",opacity:disabled?0.4:1,fontFamily:"inherit",transition:"all 0.2s"}}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v8m0 0l-3-3m3 3l3-3"/><path d="M2 12v1.5a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V12"/></svg>
+            Download .txt
+          </button>
+          <button onClick={onClear} style={{display:"flex",alignItems:"center",gap:6,padding:"10px 18px",background:"none",color:"#8b8ba0",border:"1px solid #e0dfe6",borderRadius:8,fontSize:14,fontWeight:500,cursor:"pointer",fontFamily:"inherit",marginLeft:"auto",transition:"all 0.15s"}}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor="#e05252";e.currentTarget.style.color="#e05252"}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor="#e0dfe6";e.currentTarget.style.color="#8b8ba0"}}>
+            Clear All
+          </button>
+        </div>
+      );
+    }
+
+    const LS={fontSize:11,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.8px",color:"#8b8ba0"};
+    const ML={fontFamily:"'SF Mono','Fira Code','Consolas',monospace",fontSize:14,fontWeight:600,flexShrink:0,userSelect:"none"};
+    const IS={flex:1,border:"none",outline:"none",fontSize:15,padding:"10px 4px",background:"transparent",color:"#1a1a2e",fontFamily:"'Segoe UI',system-ui,-apple-system,sans-serif"};
+    const CB={display:"flex",alignItems:"center",gap:8,borderRadius:8,border:"1px solid #e0dfe6",padding:"2px 12px 2px 14px"};
+    const XB={background:"none",border:"none",cursor:"pointer",color:"#c0bfcf",padding:4,borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"color 0.15s"};
+    const SB={fontSize:12,color:"#8b8ba0",background:"none",border:"1px solid #e0dfe6",borderRadius:6,padding:"3px 10px",cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s"};
+    const MF="'SF Mono','Fira Code','Consolas',monospace";
+
+    function App() {
+      const [blocks,setBlocks]=useState([{id:uid(),supports:[{id:uid(),text:"",linkedFrom:null}],conclusion:""}]);
+      const [copied,setCopied]=useState(false);
+      const iRefs=useRef({});
+      const isSimple=blocks.length===1;
+
+      const addBlock=()=>setBlocks(p=>[...p,{id:uid(),supports:[{id:uid(),text:"",linkedFrom:null}],conclusion:""}]);
+      const removeBlock=bid=>{if(blocks.length===1)return;setBlocks(p=>p.filter(b=>b.id!==bid).map(b=>({...b,supports:b.supports.map(s=>s.linkedFrom===bid?{...s,linkedFrom:null,text:""}:s)})))};
+      const addSupport=bid=>{const n={id:uid(),text:"",linkedFrom:null};setBlocks(p=>p.map(b=>b.id===bid?{...b,supports:[...b.supports,n]}:b));setTimeout(()=>iRefs.current[n.id]?.focus(),50)};
+      const updateSupport=(bid,sid,t)=>setBlocks(p=>p.map(b=>b.id===bid?{...b,supports:b.supports.map(s=>s.id===sid?{...s,text:t}:s)}:b));
+      const removeSupport=(bid,sid)=>setBlocks(p=>p.map(b=>{if(b.id!==bid||b.supports.length===1)return b;return{...b,supports:b.supports.filter(s=>s.id!==sid)}}));
+      const toggleLink=(bid,sid,fromBid)=>setBlocks(p=>p.map(b=>{if(b.id!==bid)return b;return{...b,supports:b.supports.map(s=>{if(s.id!==sid)return s;return s.linkedFrom===fromBid?{...s,linkedFrom:null,text:""}:{...s,linkedFrom:fromBid}})}}));
+      const updateConclusion=(bid,t)=>setBlocks(p=>p.map(b=>b.id===bid?{...b,conclusion:t}:b));
+      const handleKeyDown=(e,bid)=>{if(e.key==="Enter"){e.preventDefault();addSupport(bid)}};
+      const handleKeyDownSimple=(e,bid,sid,idx)=>{
+        if(e.key==="Enter"){e.preventDefault();addSupport(bid)}
+        const block=blocks.find(b=>b.id===bid);
+        if(e.key==="Backspace"&&block){const s=block.supports.find(s=>s.id===sid);if(s?.text===""&&block.supports.length>1){e.preventDefault();removeSupport(bid,sid);const pi=Math.max(0,idx-1);const pid=block.supports[pi]?.id;if(pid&&pid!==sid)setTimeout(()=>iRefs.current[pid]?.focus(),50)}}
+      };
+
+      const [dragS,setDragS]=useState({bid:null,i:null});
+      const [dragOS,setDragOS]=useState({bid:null,i:null});
+      const hdS=(e,bid,i)=>{setDragS({bid,i});e.dataTransfer.effectAllowed="move"};
+      const hdO=(e,bid,i)=>{e.preventDefault();setDragOS({bid,i})};
+      const hdL=()=>setDragOS({bid:null,i:null});
+      const hdD=(e,bid,di)=>{e.preventDefault();if(dragS.bid!==bid||dragS.i===null||dragS.i===di){setDragS({bid:null,i:null});setDragOS({bid:null,i:null});return}setBlocks(p=>p.map(b=>{if(b.id!==bid)return b;const u=[...b.supports];const[m]=u.splice(dragS.i,1);u.splice(di,0,m);return{...b,supports:u}}));setDragS({bid:null,i:null});setDragOS({bid:null,i:null})};
+      const hdE=()=>{setDragS({bid:null,i:null});setDragOS({bid:null,i:null})};
+
+      const hasAnyLinks=blocks.some(b=>b.supports.some(s=>s.linkedFrom!==null));
+      const getMainBlockId=()=>{if(!hasAnyLinks)return null;const linked=new Set();blocks.forEach(b=>{b.supports.forEach(s=>{if(s.linkedFrom)linked.add(s.linkedFrom)})});const cands=blocks.filter(b=>!linked.has(b.id));if(cands.length===0)return blocks[blocks.length-1].id;return cands[cands.length-1].id};
+      const mainBlockId=getMainBlockId();
+
+      const getConcLabels=()=>{const L={};if(isSimple){L[blocks[0].id]="C";return L}let ti=0;blocks.forEach(b=>{if(b.id===mainBlockId){L[b.id]="C"}else{L[b.id]=`C${letterLabel(ti)}`;ti++}});return L};
+      const concLabels=getConcLabels();
+
+      const getTopoOrder=()=>{const deps={};blocks.forEach(b=>{deps[b.id]=[]});blocks.forEach(b=>{b.supports.forEach(s=>{if(s.linkedFrom&&deps[b.id])deps[b.id].push(s.linkedFrom)})});const vis=new Set();const ord=[];const visit=id=>{if(vis.has(id))return;vis.add(id);(deps[id]||[]).forEach(visit);ord.push(id)};blocks.forEach(b=>visit(b.id));return ord};
+      const topoOrder=isSimple?[blocks[0].id]:getTopoOrder();
+
+      const getGNums=()=>{let c=1;const m={};topoOrder.forEach(bid=>{const block=blocks.find(b=>b.id===bid);if(block)block.supports.forEach(s=>{m[s.id]=c++})});return m};
+      const gNums=getGNums();
+
+      const buildOutput=()=>{
+        const gn=getGNums();const cL=getConcLabels();
+        if(isSimple){const block=blocks[0];const sL=block.supports.map(s=>`S${gn[s.id]}. ${s.text}`);const cLine=`C. ${block.conclusion}`;const all=[...sL,cLine];const mx=Math.max(...all.map(l=>l.length),10);return[...sL,"-".repeat(mx),cLine].join("\n")}
+        const order=getTopoOrder();
+        const isLinear=()=>{if(order.length<=1)return true;for(const bid of order){let fc=0;blocks.forEach(b=>{b.supports.forEach(s=>{if(s.linkedFrom===bid)fc++})});if(fc>1)return false}return true};
+        if(isLinear()&&order.length>1){
+          const res=[];let ci=0;
+          for(let oi=0;oi<order.length;oi++){
+            const bid=order[oi];const block=blocks.find(b=>b.id===bid);if(!block)continue;
+            const cl=cL[bid];const pad=" ".repeat(ci);
+            let skipId=null;if(oi>0){const prevBid=order[oi-1];const ls=block.supports.find(s=>s.linkedFrom===prevBid);if(ls)skipId=ls.id}
+            block.supports.filter(s=>s.id!==skipId).forEach(s=>{const num=gn[s.id];let text=s.text;if(s.linkedFrom){const fb=blocks.find(b=>b.id===s.linkedFrom);const fl=cL[s.linkedFrom]||"?";text=(fb?.conclusion||`[${fl}]`)+` [= ${fl}]`}res.push(`${pad}S${num}. ${text}`)});
+            const allSL=block.supports.map(s=>{const num=gn[s.id];let text=s.text;if(s.linkedFrom){const fb=blocks.find(b=>b.id===s.linkedFrom);const fl=cL[s.linkedFrom]||"?";text=(fb?.conclusion||`[${fl}]`)+` [= ${fl}]`}return`${pad}S${num}. ${text}`});
+            const cLine=`${pad}${cl}. ${block.conclusion}`;const allLines=[...allSL,cLine];const mx=Math.max(...allLines.map(l=>l.length),ci+10);res.push(pad+"-".repeat(mx-ci));
+            if(oi<order.length-1){const nBid=order[oi+1];const nBlock=blocks.find(b=>b.id===nBid);const ls=nBlock?.supports.find(s=>s.linkedFrom===bid);if(ls){const arrow="  ------->  ";const ln=gn[ls.id];const ll=cL[bid];res.push(`${cLine}${arrow}S${ln}. ${block.conclusion} [= ${ll}]`);ci=cLine.length+arrow.length}else{res.push(cLine);res.push("")}}else{res.push(cLine)}
+          }
+          return res.join("\n");
+        }
+        const res=[];
+        for(let oi=0;oi<order.length;oi++){
+          const bid=order[oi];const block=blocks.find(b=>b.id===bid);if(!block)continue;const cl=cL[bid];if(oi>0)res.push("");
+          const sLines=block.supports.map(s=>{const num=gn[s.id];let text=s.text;if(s.linkedFrom){const fb=blocks.find(b=>b.id===s.linkedFrom);const fl=cL[s.linkedFrom]||"?";text=(fb?.conclusion||`[${fl}]`)+` [= ${fl}]`}return`S${num}. ${text}`});
+          const cLine=`${cl}. ${block.conclusion}`;const allLines=[...sLines,cLine];const mx=Math.max(...allLines.map(l=>l.length),10);
+          sLines.forEach(l=>res.push(l));res.push("-".repeat(mx));
+          let feedsInto=null;blocks.forEach(b=>{b.supports.forEach(s=>{if(s.linkedFrom===bid)feedsInto={tid:b.id,sid:s.id}})});
+          if(feedsInto){const tl=cL[feedsInto.tid];const tn=gn[feedsInto.sid];const isM=feedsInto.tid===mainBlockId;res.push(`${cLine}  -------> S${tn} of ${isM?"Main Argument":`Argument ${tl}`}`)}else{res.push(cLine)}
+        }
+        return res.join("\n");
+      };
+
+      const handleCopy=async()=>{try{await navigator.clipboard.writeText(buildOutput())}catch(e){const ta=document.createElement("textarea");ta.value=buildOutput();document.body.appendChild(ta);ta.select();document.execCommand("copy");document.body.removeChild(ta)}setCopied(true);setTimeout(()=>setCopied(false),2000)};
+      const handleDownload=()=>{const b=new Blob([buildOutput()],{type:"text/plain"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="schematized_argument.txt";a.click()};
+      const handleClear=()=>setBlocks([{id:uid(),supports:[{id:uid(),text:"",linkedFrom:null}],conclusion:""}]);
+      const hasContent=blocks.some(b=>b.supports.some(s=>s.text.trim()||s.linkedFrom)||b.conclusion.trim());
+
+      const linkableBlocks=cid=>{const gd=(bid,v=new Set())=>{if(v.has(bid))return v;v.add(bid);blocks.forEach(b=>{b.supports.forEach(s=>{if(s.linkedFrom===bid)gd(b.id,v)})});return v};const d=gd(cid);return blocks.filter(b=>b.id!==cid&&!d.has(b.id))};
+
+      const XIcon=<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>;
+      const ArrowIcon=<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#6c63ff" strokeWidth="1.5" strokeLinecap="round" style={{flexShrink:0}}><path d="M1 7h12M9 3l4 4-4 4"/></svg>;
+
+      // ── Render support row ──
+      const renderSupport=(block,s,si,simple)=>{
+        const gNum=gNums[s.id];const isLinked=s.linkedFrom!==null;
+        const linkedBlock=isLinked?blocks.find(b=>b.id===s.linkedFrom):null;
+        const linkedCLabel=isLinked?concLabels[s.linkedFrom]:"";
+        const avail=linkableBlocks(block.id);
+        return (
+          <div key={s.id} style={{display:"flex",flexDirection:"column",gap:4}}>
+            <div draggable onDragStart={e=>hdS(e,block.id,si)} onDragOver={e=>hdO(e,block.id,si)} onDragLeave={hdL} onDrop={e=>hdD(e,block.id,si)} onDragEnd={hdE}
+              style={{display:"flex",alignItems:"center",gap:8,background:dragS.bid===block.id&&dragS.i===si?"#e8e7f0":simple?"#fff":"#f8f7f4",borderRadius:8,border:dragOS.bid===block.id&&dragOS.i===si&&dragS.i!==si?"2px dashed #6c63ff":"1px solid "+(simple?"#e0dfe6":"#eceaef"),padding:"2px 8px 2px 2px",opacity:dragS.bid===block.id&&dragS.i===si?0.5:1,cursor:"grab"}}>
+              <DragHandle/>
+              <span style={{...ML,color:"#6c63ff",minWidth:simple?30:36}}>S{gNum}.</span>
+              {isLinked ? (
+                <div style={{flex:1,padding:"10px 4px",fontSize:14,color:"#6c63ff",display:"flex",alignItems:"center",gap:6,minWidth:0}}>
+                  {ArrowIcon}
+                  <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    {linkedBlock?.conclusion||`[${linkedCLabel}]`}
+                    <span style={{color:"#8b8ba0",fontWeight:600,marginLeft:4,fontSize:12}}>[= {linkedCLabel}]</span>
+                  </span>
+                </div>
+              ) : (
+                <input ref={el=>(iRefs.current[s.id]=el)} type="text" value={s.text}
+                  onChange={e=>updateSupport(block.id,s.id,e.target.value)}
+                  onKeyDown={e=>simple?handleKeyDownSimple(e,block.id,s.id,si):handleKeyDown(e,block.id)}
+                  placeholder="Enter a support statement..." style={IS}/>
+              )}
+              {block.supports.length>1&&(
+                <button onClick={()=>removeSupport(block.id,s.id)} style={XB}
+                  onMouseEnter={e=>(e.currentTarget.style.color="#e05252")}
+                  onMouseLeave={e=>(e.currentTarget.style.color="#c0bfcf")}>{XIcon}</button>
+              )}
+            </div>
+            {!isSimple&&avail.length>0&&!isLinked&&(
+              <div style={{display:"flex",gap:4,paddingLeft:52,flexWrap:"wrap"}}>
+                {avail.map(lb=>(
+                  <button key={lb.id} onClick={()=>toggleLink(block.id,s.id,lb.id)} style={{fontSize:11,color:"#8b8ba0",background:"none",border:"1px dashed #d0cfdc",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s"}}
+                    onMouseEnter={e=>{e.currentTarget.style.borderColor="#6c63ff";e.currentTarget.style.color="#6c63ff"}}
+                    onMouseLeave={e=>{e.currentTarget.style.borderColor="#d0cfdc";e.currentTarget.style.color="#8b8ba0"}}>
+                    ← Link {concLabels[lb.id]}
+                  </button>
+                ))}
+              </div>
+            )}
+            {!isSimple&&isLinked&&(
+              <div style={{paddingLeft:52}}>
+                <button onClick={()=>toggleLink(block.id,s.id,s.linkedFrom)} style={{fontSize:11,color:"#e05252",background:"none",border:"1px dashed #f0c0c0",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"inherit"}}>Unlink</button>
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      // ── SIMPLE ──
+      if(isSimple){
+        const block=blocks[0];const filled=block.supports.filter(s=>s.text.trim()).length;const hasC=block.conclusion.trim().length>0;
+        return (
+          <div style={{minHeight:"100vh",background:"#f8f7f4",fontFamily:"'Segoe UI',system-ui,-apple-system,sans-serif",padding:"24px 16px",boxSizing:"border-box"}}>
+            <div style={{maxWidth:720,margin:"0 auto"}}>
+              <div style={{marginBottom:20}}>
+                <h1 style={{fontSize:22,fontWeight:700,color:"#1a1a2e",margin:"0 0 4px 0",letterSpacing:"-0.3px"}}>Schematized Argument Builder</h1>
+                <p style={{fontSize:14,color:"#6b6b80",margin:0,lineHeight:1.5}}>Add your support statements below and fill in the conclusion. Drag to reorder. Press <strong>Enter</strong> to add a new line.</p>
+              </div>
+              <div style={{marginBottom:4}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                  <span style={LS}>Support Statements</span>
+                  <span style={{fontSize:12,color:"#8b8ba0"}}>{filled} statement{filled!==1?"s":""}</span>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  {block.supports.map((s,i)=>renderSupport(block,s,i,true))}
+                </div>
+                <AddBtn onClick={()=>addSupport(block.id)} label="Add support"/>
+              </div>
+              <div style={{borderTop:"2.5px solid #1a1a2e",margin:"20px 0"}}/>
+              <div style={{marginBottom:28}}>
+                <span style={{...LS,display:"block",marginBottom:10}}>Conclusion</span>
+                <div style={{...CB,background:"#fff"}}>
+                  <span style={{...ML,color:"#e05252"}}>C.</span>
+                  <input type="text" value={block.conclusion} onChange={e=>updateConclusion(block.id,e.target.value)} placeholder="Enter the conclusion..." style={IS}/>
+                </div>
+              </div>
+              {(filled>0||hasC)&&(
+                <div style={{background:"#fff",border:"1px solid #e0dfe6",borderRadius:10,padding:"18px 20px",marginBottom:20}}>
+                  <span style={{...LS,display:"block",marginBottom:12}}>Preview</span>
+                  <pre style={{fontFamily:MF,fontSize:14,lineHeight:1.7,color:"#1a1a2e",margin:0,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{buildOutput()}</pre>
+                </div>
+              )}
+              <ActBtns copied={copied} onCopy={handleCopy} onDownload={handleDownload} onClear={handleClear} disabled={filled===0&&!hasC}/>
+              <div style={{marginTop:24,borderTop:"1px solid #e0dfe6",paddingTop:20}}>
+                <button onClick={addBlock} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,width:"100%",padding:"12px",background:"none",border:"2px dashed #d0cfdc",borderRadius:12,color:"#8b8ba0",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s"}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor="#6c63ff";e.currentTarget.style.color="#6c63ff"}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor="#d0cfdc";e.currentTarget.style.color="#8b8ba0"}}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
+                  Add argument
+                </button>
+                <p style={{fontSize:12,color:"#a0a0b2",marginTop:8,textAlign:"center"}}>Add another argument to build a complex argument with tributaries.</p>
+              </div>
+              <p style={{fontSize:12,color:"#a0a0b2",marginTop:24,textAlign:"center",lineHeight:1.5}}>Tip: Press <strong>Enter</strong> to add a new support line. Press <strong>Backspace</strong> on an empty line to remove it.</p>
+            </div>
+          </div>
+        );
+      }
+
+      // ── COMPLEX ──
+      return (
+        <div style={{minHeight:"100vh",background:"#f8f7f4",fontFamily:"'Segoe UI',system-ui,-apple-system,sans-serif",padding:"24px 16px",boxSizing:"border-box"}}>
+          <div style={{maxWidth:720,margin:"0 auto"}}>
+            <div style={{marginBottom:20}}>
+              <h1 style={{fontSize:22,fontWeight:700,color:"#1a1a2e",margin:"0 0 4px 0",letterSpacing:"-0.3px"}}>Schematized Argument Builder</h1>
+              <p style={{fontSize:14,color:"#6b6b80",margin:0,lineHeight:1.5}}>Build your complex argument. Link conclusions to support slots to connect tributaries.</p>
+            </div>
+            {blocks.map(block=>{
+              const isMain=block.id===mainBlockId;const cLabel=concLabels[block.id];
+              return (
+                <div key={block.id} style={{background:"#fff",border:isMain?"2px solid #e05252":"1px solid #e0dfe6",borderRadius:12,padding:"16px 18px",marginBottom:12}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+                    <span style={{background:isMain?"#e05252":"#6c63ff",color:"#fff",fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20,letterSpacing:"0.5px",textTransform:"uppercase"}}>
+                      {isMain?"Main Argument":hasAnyLinks?`Tributary argument ${cLabel.slice(1)}`:`Argument ${cLabel.slice(1)}`}
+                    </span>
+                    {blocks.length>1&&(
+                      <button onClick={()=>removeBlock(block.id)} style={SB}
+                        onMouseEnter={e=>{e.currentTarget.style.color="#e05252";e.currentTarget.style.borderColor="#e05252"}}
+                        onMouseLeave={e=>{e.currentTarget.style.color="#8b8ba0";e.currentTarget.style.borderColor="#e0dfe6"}}>Remove</button>
+                    )}
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:8}}>
+                    {block.supports.map((s,si)=>renderSupport(block,s,si,false))}
+                  </div>
+                  <AddBtn onClick={()=>addSupport(block.id)} label="Add support"/>
+                  <div style={{borderTop:"2.5px solid #1a1a2e",margin:"14px 0"}}/>
+                  <div style={{...CB,background:"#f8f7f4"}}>
+                    <span style={{...ML,color:isMain?"#e05252":"#d97706",minWidth:30}}>{cLabel}.</span>
+                    <input type="text" value={block.conclusion} onChange={e=>updateConclusion(block.id,e.target.value)}
+                      placeholder={isMain?"Enter the main conclusion...":`Enter conclusion ${cLabel.slice(1)}...`} style={IS}/>
+                  </div>
+                </div>
+              );
+            })}
+            <button onClick={addBlock} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,width:"100%",padding:"12px",background:"none",border:"2px dashed #d0cfdc",borderRadius:12,color:"#8b8ba0",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginBottom:24,transition:"all 0.15s"}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor="#6c63ff";e.currentTarget.style.color="#6c63ff"}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor="#d0cfdc";e.currentTarget.style.color="#8b8ba0"}}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
+              Add argument
+            </button>
+            {hasContent&&(
+              <div style={{background:"#fff",border:"1px solid #e0dfe6",borderRadius:10,padding:"18px 20px",marginBottom:20}}>
+                <span style={{...LS,display:"block",marginBottom:12}}>Preview</span>
+                <pre style={{fontFamily:MF,fontSize:13,lineHeight:1.6,color:"#1a1a2e",margin:0,whiteSpace:"pre",overflowX:"auto"}}>{buildOutput()}</pre>
+              </div>
+            )}
+            <ActBtns copied={copied} onCopy={handleCopy} onDownload={handleDownload} onClear={handleClear} disabled={!hasContent}/>
+            <p style={{fontSize:12,color:"#a0a0b2",marginTop:24,textAlign:"center",lineHeight:1.5}}>Tip: Press <strong>Enter</strong> to add a new support line. Use the link buttons to connect a tributary conclusion into a support slot.</p>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+  </script>
+</body>
+</html>
