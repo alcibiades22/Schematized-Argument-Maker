@@ -311,5 +311,197 @@
 
     ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
   </script>
+
+<!-- ===== FEEDBACK BUTTON ===== -->
+<button id="feedback-btn" aria-label="Give feedback on this tool" title="Feedback">
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+    style="vertical-align: middle; margin-right: 5px;">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+  </svg>
+  Feedback
+</button>
+
+<!-- ===== FEEDBACK MODAL ===== -->
+<div id="feedback-overlay" role="dialog" aria-modal="true" aria-label="Feedback form">
+  <div id="feedback-modal">
+    <div id="feedback-header">
+      <span id="feedback-title">How's the tool working for you?</span>
+      <button id="feedback-close" aria-label="Close feedback form">&times;</button>
+    </div>
+    <div id="feedback-body">
+      <iframe id="feedback-iframe"
+        src=""
+        frameborder="0"
+        width="100%"
+        height="100%"
+        style="background: transparent;">
+      </iframe>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* --- Feedback Button --- */
+  #feedback-btn {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    z-index: 9998;
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 16px;
+    background-color: #4a5568;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: background-color 0.2s ease, transform 0.15s ease;
+  }
+  #feedback-btn:hover {
+    background-color: #2d3748;
+    transform: translateY(-1px);
+  }
+  #feedback-btn:focus-visible {
+    outline: 2px solid #667eea;
+    outline-offset: 2px;
+  }
+
+  /* --- Modal Overlay --- */
+  #feedback-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background-color: rgba(0, 0, 0, 0.45);
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+  }
+  #feedback-overlay.open {
+    display: flex;
+  }
+
+  /* --- Modal Box --- */
+  #feedback-modal {
+    background: #fff;
+    border-radius: 10px;
+    width: 100%;
+    max-width: 540px;
+    height: 80vh;
+    max-height: 620px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+    animation: feedbackSlideUp 0.25s ease-out;
+  }
+  @keyframes feedbackSlideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* --- Header --- */
+  #feedback-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid #e2e8f0;
+    background-color: #f7fafc;
+  }
+  #feedback-title {
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: #2d3748;
+  }
+  #feedback-close {
+    background: none;
+    border: none;
+    font-size: 22px;
+    color: #a0aec0;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+    transition: color 0.15s ease;
+  }
+  #feedback-close:hover {
+    color: #4a5568;
+  }
+  #feedback-close:focus-visible {
+    outline: 2px solid #667eea;
+    outline-offset: 2px;
+  }
+
+  /* --- Body (iframe container) --- */
+  #feedback-body {
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* --- Responsive --- */
+  @media (max-width: 600px) {
+    #feedback-modal {
+      max-width: 100%;
+      height: 90vh;
+      max-height: none;
+      border-radius: 10px 10px 0 0;
+    }
+    #feedback-overlay {
+      align-items: flex-end;
+      padding: 0;
+    }
+    #feedback-btn {
+      bottom: 12px;
+      right: 12px;
+      font-size: 12px;
+      padding: 7px 12px;
+    }
+  }
+</style>
+
+<script>
+(function () {
+  var AIRTABLE_FORM_URL = 'https://airtable.com/appxdI0VPvkKlM8u1/shrkKLJL7BcDx8qDs';
+
+  var btn     = document.getElementById('feedback-btn');
+  var overlay = document.getElementById('feedback-overlay');
+  var closeBtn = document.getElementById('feedback-close');
+  var iframe  = document.getElementById('feedback-iframe');
+
+  function openModal() {
+    iframe.src = AIRTABLE_FORM_URL;
+    overlay.classList.add('open');
+    closeBtn.focus();
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal() {
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+    iframe.src = '';
+    btn.focus();
+  }
+
+  btn.addEventListener('click', openModal);
+  closeBtn.addEventListener('click', closeModal);
+
+  overlay.addEventListener('click', function (e) {
+    if (e.target === overlay) closeModal();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && overlay.classList.contains('open')) {
+      closeModal();
+    }
+  });
+})();
+</script>
+
 </body>
 </html>
