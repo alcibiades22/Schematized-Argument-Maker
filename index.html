@@ -17,10 +17,11 @@
 <body>
   <div id="root"></div>
   <script type="text/babel">
-    const { useState, useRef } = React;
+    const { useState, useRef, useEffect } = React;
 
     function uid() { return Math.random().toString(36).slice(2, 10); }
     function letterLabel(i) { return String.fromCharCode(97 + i); }
+    const STORAGE_KEY = "schematizedArgumentBuilder.student.v2";
 
     function DragHandle() {
       return (
@@ -76,11 +77,55 @@
       const [blocks,setBlocks]=useState([{id:uid(),supports:[{id:uid(),text:"",linkedFrom:null}],conclusion:"",diagnostic:false}]);
       const [copied,setCopied]=useState(false);
       const iRefs=useRef({});
+      const draftLoadedRef=useRef(false);
+      const saveTimerRef=useRef(null);
       const isSimple=blocks.length===1;
+      const [iq,setIq]=useState("");
+      const [rivals,setRivals]=useState([""]);
+      const [saveState,setSaveState]=useState("Draft not saved yet");
+
+      useEffect(()=>{
+        try {
+          const saved=localStorage.getItem(STORAGE_KEY);
+          if(saved){
+            const draft=JSON.parse(saved);
+            if(draft&&Array.isArray(draft.blocks)){
+              setBlocks(draft.blocks);
+              setIq(typeof draft.iq==="string"?draft.iq:"");
+              setRivals(Array.isArray(draft.rivals)&&draft.rivals.length?draft.rivals:[""]);
+              setSaveState("Draft restored");
+            }
+          }
+        } catch(err) {
+          console.warn("Could not restore draft:",err);
+          setSaveState("Autosave unavailable");
+        } finally {
+          draftLoadedRef.current=true;
+        }
+      },[]);
+
+      useEffect(()=>{
+        if(!draftLoadedRef.current)return;
+        clearTimeout(saveTimerRef.current);
+        setSaveState("Saving...");
+        saveTimerRef.current=setTimeout(()=>{
+          try {
+            localStorage.setItem(STORAGE_KEY,JSON.stringify({blocks,iq,rivals}));
+            setSaveState("Autosaved");
+          } catch(err) {
+            console.warn("Could not save draft:",err);
+            setSaveState("Autosave unavailable");
+          }
+        },350);
+        return()=>clearTimeout(saveTimerRef.current);
+      },[blocks,iq,rivals]);
 
       const addBlock=()=>setBlocks(p=>[...p,{id:uid(),supports:[{id:uid(),text:"",linkedFrom:null}],conclusion:"",diagnostic:false}]);
       const toggleDiagnostic=bid=>setBlocks(p=>p.map(b=>b.id===bid?{...b,diagnostic:!b.diagnostic}:b));
       const removeBlock=bid=>{if(blocks.length===1)return;setBlocks(p=>p.filter(b=>b.id!==bid).map(b=>({...b,supports:b.supports.map(s=>s.linkedFrom===bid?{...s,linkedFrom:null,text:""}:s)})))};
+      const addRival=()=>setRivals(p=>[...p,""]);
+      const updateRival=(i,t)=>setRivals(p=>p.map((r,ri)=>ri===i?t:r));
+      const removeRival=i=>{if(rivals.length>1)setRivals(p=>p.filter((_,ri)=>ri!==i))};
       const addSupport=bid=>{const n={id:uid(),text:"",linkedFrom:null};setBlocks(p=>p.map(b=>b.id===bid?{...b,supports:[...b.supports,n]}:b));setTimeout(()=>iRefs.current[n.id]?.focus(),50)};
       const updateSupport=(bid,sid,t)=>setBlocks(p=>p.map(b=>b.id===bid?{...b,supports:b.supports.map(s=>s.id===sid?{...s,text:t}:s)}:b));
       const removeSupport=(bid,sid)=>setBlocks(p=>p.map(b=>{if(b.id!==bid||b.supports.length===1)return b;return{...b,supports:b.supports.filter(s=>s.id!==sid)}}));
@@ -95,17 +140,25 @@
 
       const [dragS,setDragS]=useState({bid:null,i:null});
       const [dragOS,setDragOS]=useState({bid:null,i:null});
+      const [dragR,setDragR]=useState(null);
+      const [dragOR,setDragOR]=useState(null);
       const hdS=(e,bid,i)=>{setDragS({bid,i});e.dataTransfer.effectAllowed="move"};
       const hdO=(e,bid,i)=>{e.preventDefault();setDragOS({bid,i})};
       const hdL=()=>setDragOS({bid:null,i:null});
       const hdD=(e,bid,di)=>{e.preventDefault();if(dragS.bid!==bid||dragS.i===null||dragS.i===di){setDragS({bid:null,i:null});setDragOS({bid:null,i:null});return}setBlocks(p=>p.map(b=>{if(b.id!==bid)return b;const u=[...b.supports];const[m]=u.splice(dragS.i,1);u.splice(di,0,m);return{...b,supports:u}}));setDragS({bid:null,i:null});setDragOS({bid:null,i:null})};
       const hdE=()=>{setDragS({bid:null,i:null});setDragOS({bid:null,i:null})};
+      const hdRS=(e,i)=>{setDragR(i);e.dataTransfer.effectAllowed="move"};
+      const hdRO=(e,i)=>{e.preventDefault();setDragOR(i)};
+      const hdRL=()=>setDragOR(null);
+      const hdRD=(e,di)=>{e.preventDefault();if(dragR===null||dragR===di){setDragR(null);setDragOR(null);return}setRivals(p=>{const u=[...p];const[m]=u.splice(dragR,1);u.splice(di,0,m);return u});setDragR(null);setDragOR(null)};
+      const hdRE=()=>{setDragR(null);setDragOR(null)};
 
       const hasAnyLinks=blocks.some(b=>b.supports.some(s=>s.linkedFrom!==null));
       const getMainBlockId=()=>{if(!hasAnyLinks)return null;const linked=new Set();blocks.forEach(b=>{b.supports.forEach(s=>{if(s.linkedFrom)linked.add(s.linkedFrom)})});const cands=blocks.filter(b=>!linked.has(b.id));if(cands.length===0)return blocks[blocks.length-1].id;return cands[cands.length-1].id};
       const mainBlockId=getMainBlockId();
 
-      const getConcLabels=()=>{const L={};if(isSimple){L[blocks[0].id]="C";return L}let ti=0;blocks.forEach(b=>{if(b.id===mainBlockId){L[b.id]="C"}else{L[b.id]=`C${letterLabel(ti)}`;ti++}});return L};
+      const hasIbeFields=()=>iq.trim()||rivals.some(r=>r.trim());
+      const getConcLabels=()=>{const L={};if(isSimple){L[blocks[0].id]=hasIbeFields()?"C1":"C";return L}let ti=0;blocks.forEach(b=>{if(b.id===mainBlockId){L[b.id]=hasIbeFields()?"C1":"C"}else{L[b.id]=hasIbeFields()?`C1${letterLabel(ti)}`:`C${letterLabel(ti)}`;ti++}});return L};
       const concLabels=getConcLabels();
 
       const getTopoOrder=()=>{const deps={};blocks.forEach(b=>{deps[b.id]=[]});blocks.forEach(b=>{b.supports.forEach(s=>{if(s.linkedFrom&&deps[b.id])deps[b.id].push(s.linkedFrom)})});const vis=new Set();const ord=[];const visit=id=>{if(vis.has(id))return;vis.add(id);(deps[id]||[]).forEach(visit);ord.push(id)};blocks.forEach(b=>visit(b.id));return ord};
@@ -115,9 +168,20 @@
       const gNums=getGNums();
 
       const mkSep=(mx,diag)=>diag?("=".repeat(mx-1)+"d"):"-".repeat(mx);
+      const getMainConclusionLabel=()=>hasIbeFields()?"C1":"C";
+      const appendIbeFields=core=>{
+        const out=[core];
+        if(iq.trim())out.push("",`IQ: ${iq}`);
+        const filledRivals=rivals.filter(r=>r.trim());
+        if(filledRivals.length>0){
+          out.push("","Rivals:");
+          filledRivals.forEach((r,i)=>out.push(`C${i+2}. ${r}`));
+        }
+        return out.join("\n");
+      };
       const buildOutput=()=>{
         const gn=getGNums();const cL=getConcLabels();
-        if(isSimple){const block=blocks[0];const sL=block.supports.map(s=>`S${gn[s.id]}. ${s.text}`);const cLine=`C. ${block.conclusion}`;const all=[...sL,cLine];const mx=Math.max(...all.map(l=>l.length),10);return[...sL,mkSep(mx,block.diagnostic),cLine].join("\n")}
+        if(isSimple){const block=blocks[0];const cLabel=getMainConclusionLabel();const sL=block.supports.map(s=>`S${gn[s.id]}. ${s.text}`);const cLine=`${cLabel}. ${block.conclusion}`;const all=[...sL,cLine];const mx=Math.max(...all.map(l=>l.length),10);return appendIbeFields([...sL,mkSep(mx,block.diagnostic),cLine].join("\n"))}
         const order=getTopoOrder();
         const isLinear=()=>{if(order.length<=1)return true;for(const bid of order){let fc=0;blocks.forEach(b=>{b.supports.forEach(s=>{if(s.linkedFrom===bid)fc++})});if(fc>1)return false}return true};
         if(isLinear()&&order.length>1){
@@ -131,7 +195,7 @@
             const cLine=`${pad}${cl}. ${block.conclusion}`;const allLines=[...allSL,cLine];const mx=Math.max(...allLines.map(l=>l.length),ci+10);const sepW=mx-ci;const sep=block.diagnostic?("=".repeat(sepW-1)+"d"):"-".repeat(sepW);res.push(pad+sep);
             if(oi<order.length-1){const nBid=order[oi+1];const nBlock=blocks.find(b=>b.id===nBid);const ls=nBlock?.supports.find(s=>s.linkedFrom===bid);if(ls){const arrow="  ------->  ";const ln=gn[ls.id];const ll=cL[bid];res.push(`${cLine}${arrow}S${ln}. ${block.conclusion} [= ${ll}]`);ci=cLine.length+arrow.length}else{res.push(cLine);res.push("")}}else{res.push(cLine)}
           }
-          return res.join("\n");
+          return appendIbeFields(res.join("\n"));
         }
         const res=[];
         for(let oi=0;oi<order.length;oi++){
@@ -142,18 +206,60 @@
           let feedsInto=null;blocks.forEach(b=>{b.supports.forEach(s=>{if(s.linkedFrom===bid)feedsInto={tid:b.id,sid:s.id}})});
           if(feedsInto){const tl=cL[feedsInto.tid];const tn=gn[feedsInto.sid];const isM=feedsInto.tid===mainBlockId;res.push(`${cLine}  -------> S${tn} of ${isM?"Main Argument":`Argument ${tl}`}`)}else{res.push(cLine)}
         }
-        return res.join("\n");
+        return appendIbeFields(res.join("\n"));
       };
 
       const handleCopy=async()=>{try{await navigator.clipboard.writeText(buildOutput())}catch(e){const ta=document.createElement("textarea");ta.value=buildOutput();document.body.appendChild(ta);ta.select();document.execCommand("copy");document.body.removeChild(ta)}setCopied(true);setTimeout(()=>setCopied(false),2000)};
       const handleDownload=()=>{const b=new Blob([buildOutput()],{type:"text/plain"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="schematized_argument.txt";a.click()};
-      const handleClear=()=>setBlocks([{id:uid(),supports:[{id:uid(),text:"",linkedFrom:null}],conclusion:"",diagnostic:false}]);
-      const hasContent=blocks.some(b=>b.supports.some(s=>s.text.trim()||s.linkedFrom)||b.conclusion.trim());
+      const handleClear=()=>{setBlocks([{id:uid(),supports:[{id:uid(),text:"",linkedFrom:null}],conclusion:"",diagnostic:false}]);setIq("");setRivals([""])};
+      const hasContent=blocks.some(b=>b.supports.some(s=>s.text.trim()||s.linkedFrom)||b.conclusion.trim())||iq.trim()||rivals.some(r=>r.trim());
 
       const linkableBlocks=cid=>{const gd=(bid,v=new Set())=>{if(v.has(bid))return v;v.add(bid);blocks.forEach(b=>{b.supports.forEach(s=>{if(s.linkedFrom===bid)gd(b.id,v)})});return v};const d=gd(cid);return blocks.filter(b=>b.id!==cid&&!d.has(b.id))};
 
       const XIcon=<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>;
       const ArrowIcon=<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#e9171f" strokeWidth="1.5" strokeLinecap="round" style={{flexShrink:0}}><path d="M1 7h12M9 3l4 4-4 4"/></svg>;
+
+      const renderIbeFields=()=>(
+        <div style={{marginBottom:28}}>
+          <div style={{marginBottom:16}}>
+            <span style={{...LS,display:"block",marginBottom:10}}>Implicit Question</span>
+            <div style={{...CB,background:"#fff"}}>
+              <span style={{...ML,color:"#d97706",minWidth:30}}>IQ.</span>
+              <input type="text" value={iq} onChange={e=>setIq(e.target.value)}
+                placeholder="What question does the evidence raise?"
+                style={IS}/>
+            </div>
+          </div>
+          <div>
+            <span style={{...LS,display:"block",marginBottom:10}}>Rival Conclusions</span>
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              {rivals.map((r,i)=>(
+                <div key={i} draggable onDragStart={e=>hdRS(e,i)} onDragOver={e=>hdRO(e,i)} onDragLeave={hdRL} onDrop={e=>hdRD(e,i)} onDragEnd={hdRE}
+                  style={{
+                    ...CB,
+                    background:dragR===i?"#fff8e8":"#fff",
+                    border:dragOR===i&&dragR!==i?"2px dashed #e9171f":CB.border,
+                    padding:dragOR===i&&dragR!==i?"1px 11px 1px 1px":"2px 12px 2px 2px",
+                    opacity:dragR===i?0.5:1,
+                    cursor:"grab",
+                  }}>
+                  <DragHandle/>
+                  <span style={{...ML,color:"#6b7280",minWidth:36}}>C{i+2}.</span>
+                  <input type="text" value={r} onChange={e=>updateRival(i,e.target.value)}
+                    placeholder={`Rival explanation ${i+1}...`}
+                    style={IS}/>
+                  {rivals.length>1&&(
+                    <button onClick={()=>removeRival(i)} style={XB}
+                      onMouseEnter={e=>(e.currentTarget.style.color="#e9171f")}
+                      onMouseLeave={e=>(e.currentTarget.style.color="#c0bfcf")}>{XIcon}</button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <AddBtn onClick={addRival} label="Add rival"/>
+          </div>
+        </div>
+      );
 
       // ── Render support row ──
       const renderSupport=(block,s,si,simple)=>{
@@ -216,6 +322,7 @@
               <div style={{marginBottom:20}}>
                 <h1 style={{fontSize:22,fontWeight:700,color:"#000000",margin:"0 0 4px 0",letterSpacing:"-0.3px"}}>Schematized Argument Builder</h1>
                 <p style={{fontSize:14,color:"#b4babc",margin:0,lineHeight:1.5}}>Add your support statements below and fill in the conclusion. Drag to reorder. Press <strong>Enter</strong> to add a new line.</p>
+                <p style={{fontSize:11,color:"#b4babc",margin:"4px 0 0 0",lineHeight:1.4}}>{saveState}</p>
               </div>
               <div style={{marginBottom:4}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
@@ -240,17 +347,18 @@
               <div style={{marginBottom:28}}>
                 <span style={{...LS,display:"block",marginBottom:10}}>Conclusion</span>
                 <div style={{...CB,background:"#fff"}}>
-                  <span style={{...ML,color:"#e9171f"}}>C.</span>
+                  <span style={{...ML,color:"#e9171f"}}>{getMainConclusionLabel()}.</span>
                   <input type="text" value={block.conclusion} onChange={e=>updateConclusion(block.id,e.target.value)} placeholder="Enter the conclusion..." style={IS}/>
                 </div>
               </div>
-              {(filled>0||hasC)&&(
+              {renderIbeFields()}
+              {hasContent&&(
                 <div style={{background:"#fff",border:"1px solid #d8dbdc",borderRadius:10,padding:"18px 20px",marginBottom:20}}>
                   <span style={{...LS,display:"block",marginBottom:12}}>Preview</span>
                   <pre style={{fontFamily:MF,fontSize:14,lineHeight:1.7,color:"#000000",margin:0,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{buildOutput()}</pre>
                 </div>
               )}
-              <ActBtns copied={copied} onCopy={handleCopy} onDownload={handleDownload} onClear={handleClear} disabled={filled===0&&!hasC}/>
+              <ActBtns copied={copied} onCopy={handleCopy} onDownload={handleDownload} onClear={handleClear} disabled={!hasContent}/>
               <div style={{marginTop:24,borderTop:"1px solid #d8dbdc",paddingTop:20}}>
                 <button onClick={addBlock} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,width:"100%",padding:"12px",background:"none",border:"2px dashed #b4babc",borderRadius:12,color:"#b4babc",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s"}}
                   onMouseEnter={e=>{e.currentTarget.style.borderColor="#e9171f";e.currentTarget.style.color="#e9171f"}}
@@ -273,6 +381,7 @@
             <div style={{marginBottom:20}}>
               <h1 style={{fontSize:22,fontWeight:700,color:"#000000",margin:"0 0 4px 0",letterSpacing:"-0.3px"}}>Schematized Argument Builder</h1>
               <p style={{fontSize:14,color:"#b4babc",margin:0,lineHeight:1.5}}>Build your complex argument. Link conclusions to support slots to connect tributaries.</p>
+              <p style={{fontSize:11,color:"#b4babc",margin:"4px 0 0 0",lineHeight:1.4}}>{saveState}</p>
             </div>
             {blocks.map(block=>{
               const isMain=block.id===mainBlockId;const cLabel=concLabels[block.id];
@@ -316,6 +425,7 @@
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
               Add argument
             </button>
+            {renderIbeFields()}
             {hasContent&&(
               <div style={{background:"#fff",border:"1px solid #d8dbdc",borderRadius:10,padding:"18px 20px",marginBottom:20}}>
                 <span style={{...LS,display:"block",marginBottom:12}}>Preview</span>
