@@ -1,495 +1,1534 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Schematized Argument Builder</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #f8f7f4; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
-    input:focus { outline: none; }
-    button:focus { outline: none; }
-  </style>
-</head>
-<body>
-  <div id="root"></div>
-  <script type="text/babel">
-    const { useState, useRef, useEffect } = React;
-
-    function uid() { return Math.random().toString(36).slice(2, 10); }
-    function letterLabel(i) { return String.fromCharCode(97 + i); }
-    const STORAGE_KEY = "schematizedArgumentBuilder.student.v2";
-
-    function DragHandle() {
-      return (
-        <div style={{ display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"8px 4px",color:"#b4babc",flexShrink:0,cursor:"grab",userSelect:"none" }}>
-          <svg width="12" height="18" viewBox="0 0 12 18" fill="currentColor">
-            <circle cx="3" cy="3" r="1.5"/><circle cx="9" cy="3" r="1.5"/>
-            <circle cx="3" cy="9" r="1.5"/><circle cx="9" cy="9" r="1.5"/>
-            <circle cx="3" cy="15" r="1.5"/><circle cx="9" cy="15" r="1.5"/>
-          </svg>
-        </div>
-      );
-    }
-
-    function AddBtn({onClick,label}) {
-      return (
-        <button onClick={onClick} style={{display:"flex",alignItems:"center",gap:6,marginTop:8,padding:"8px 14px",background:"none",border:"1px dashed #b4babc",borderRadius:8,color:"#b4babc",fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}
-          onMouseEnter={e=>{e.currentTarget.style.borderColor="#e9171f";e.currentTarget.style.color="#e9171f"}}
-          onMouseLeave={e=>{e.currentTarget.style.borderColor="#b4babc";e.currentTarget.style.color="#b4babc"}}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg>
-          {label}
-        </button>
-      );
-    }
-
-    function ActBtns({copied,onCopy,onDownload,onClear,disabled}) {
-      return (
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          <button onClick={onCopy} disabled={disabled} style={{display:"flex",alignItems:"center",gap:6,padding:"10px 18px",background:copied?"#fed184":"#e9171f",color:"#fff",border:"none",borderRadius:8,fontSize:14,fontWeight:600,cursor:disabled?"not-allowed":"pointer",opacity:disabled?0.4:1,fontFamily:"inherit",transition:"all 0.2s"}}>
-            {copied ? (<><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3,9 6,12 13,4"/></svg>Copied!</>) : (<><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1.5 1.5 0 0 1 1.5-1.5H11"/></svg>Copy to Clipboard</>)}
-          </button>
-          <button onClick={onDownload} disabled={disabled} style={{display:"flex",alignItems:"center",gap:6,padding:"10px 18px",background:"#fff",color:"#000000",border:"1px solid #b4babc",borderRadius:8,fontSize:14,fontWeight:600,cursor:disabled?"not-allowed":"pointer",opacity:disabled?0.4:1,fontFamily:"inherit",transition:"all 0.2s"}}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v8m0 0l-3-3m3 3l3-3"/><path d="M2 12v1.5a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V12"/></svg>
-            Download .txt
-          </button>
-          <button onClick={onClear} style={{display:"flex",alignItems:"center",gap:6,padding:"10px 18px",background:"none",color:"#b4babc",border:"1px solid #d8dbdc",borderRadius:8,fontSize:14,fontWeight:500,cursor:"pointer",fontFamily:"inherit",marginLeft:"auto",transition:"all 0.15s"}}
-            onMouseEnter={e=>{e.currentTarget.style.borderColor="#e9171f";e.currentTarget.style.color="#e9171f"}}
-            onMouseLeave={e=>{e.currentTarget.style.borderColor="#d8dbdc";e.currentTarget.style.color="#b4babc"}}>
-            Clear All
-          </button>
-        </div>
-      );
-    }
-
-    const LS={fontSize:11,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.8px",color:"#b4babc"};
-    const ML={fontFamily:"'SF Mono','Fira Code','Consolas',monospace",fontSize:14,fontWeight:600,flexShrink:0,userSelect:"none"};
-    const IS={flex:1,border:"none",outline:"none",fontSize:15,padding:"10px 4px",background:"transparent",color:"#000000",fontFamily:"'Segoe UI',system-ui,-apple-system,sans-serif"};
-    const CB={display:"flex",alignItems:"center",gap:8,borderRadius:8,border:"1px solid #d8dbdc",padding:"2px 12px 2px 14px"};
-    const XB={background:"none",border:"none",cursor:"pointer",color:"#c0bfcf",padding:4,borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"color 0.15s"};
-    const SB={fontSize:12,color:"#b4babc",background:"none",border:"1px solid #d8dbdc",borderRadius:6,padding:"3px 10px",cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s"};
-    const MF="'SF Mono','Fira Code','Consolas',monospace";
-
-    function App() {
-      const [blocks,setBlocks]=useState([{id:uid(),supports:[{id:uid(),text:"",linkedFrom:null}],conclusion:"",diagnostic:false}]);
-      const [copied,setCopied]=useState(false);
-      const iRefs=useRef({});
-      const draftLoadedRef=useRef(false);
-      const saveTimerRef=useRef(null);
-      const isSimple=blocks.length===1;
-      const [iq,setIq]=useState("");
-      const [rivals,setRivals]=useState([""]);
-      const [saveState,setSaveState]=useState("Draft not saved yet");
-
-      useEffect(()=>{
-        try {
-          const saved=localStorage.getItem(STORAGE_KEY);
-          if(saved){
-            const draft=JSON.parse(saved);
-            if(draft&&Array.isArray(draft.blocks)){
-              setBlocks(draft.blocks);
-              setIq(typeof draft.iq==="string"?draft.iq:"");
-              setRivals(Array.isArray(draft.rivals)&&draft.rivals.length?draft.rivals:[""]);
-              setSaveState("Draft restored");
-            }
-          }
-        } catch(err) {
-          console.warn("Could not restore draft:",err);
-          setSaveState("Autosave unavailable");
-        } finally {
-          draftLoadedRef.current=true;
-        }
-      },[]);
-
-      useEffect(()=>{
-        if(!draftLoadedRef.current)return;
-        clearTimeout(saveTimerRef.current);
-        setSaveState("Saving...");
-        saveTimerRef.current=setTimeout(()=>{
-          try {
-            localStorage.setItem(STORAGE_KEY,JSON.stringify({blocks,iq,rivals}));
-            setSaveState("Autosaved");
-          } catch(err) {
-            console.warn("Could not save draft:",err);
-            setSaveState("Autosave unavailable");
-          }
-        },350);
-        return()=>clearTimeout(saveTimerRef.current);
-      },[blocks,iq,rivals]);
-
-      const addBlock=()=>setBlocks(p=>[...p,{id:uid(),supports:[{id:uid(),text:"",linkedFrom:null}],conclusion:"",diagnostic:false}]);
-      const toggleDiagnostic=bid=>setBlocks(p=>p.map(b=>b.id===bid?{...b,diagnostic:!b.diagnostic}:b));
-      const removeBlock=bid=>{if(blocks.length===1)return;setBlocks(p=>p.filter(b=>b.id!==bid).map(b=>({...b,supports:b.supports.map(s=>s.linkedFrom===bid?{...s,linkedFrom:null,text:""}:s)})))};
-      const addRival=()=>setRivals(p=>[...p,""]);
-      const updateRival=(i,t)=>setRivals(p=>p.map((r,ri)=>ri===i?t:r));
-      const removeRival=i=>{if(rivals.length>1)setRivals(p=>p.filter((_,ri)=>ri!==i))};
-      const addSupport=bid=>{const n={id:uid(),text:"",linkedFrom:null};setBlocks(p=>p.map(b=>b.id===bid?{...b,supports:[...b.supports,n]}:b));setTimeout(()=>iRefs.current[n.id]?.focus(),50)};
-      const updateSupport=(bid,sid,t)=>setBlocks(p=>p.map(b=>b.id===bid?{...b,supports:b.supports.map(s=>s.id===sid?{...s,text:t}:s)}:b));
-      const removeSupport=(bid,sid)=>setBlocks(p=>p.map(b=>{if(b.id!==bid||b.supports.length===1)return b;return{...b,supports:b.supports.filter(s=>s.id!==sid)}}));
-      const toggleLink=(bid,sid,fromBid)=>setBlocks(p=>p.map(b=>{if(b.id!==bid)return b;return{...b,supports:b.supports.map(s=>{if(s.id!==sid)return s;return s.linkedFrom===fromBid?{...s,linkedFrom:null,text:""}:{...s,linkedFrom:fromBid}})}}));
-      const updateConclusion=(bid,t)=>setBlocks(p=>p.map(b=>b.id===bid?{...b,conclusion:t}:b));
-      const handleKeyDown=(e,bid)=>{if(e.key==="Enter"){e.preventDefault();addSupport(bid)}};
-      const handleKeyDownSimple=(e,bid,sid,idx)=>{
-        if(e.key==="Enter"){e.preventDefault();addSupport(bid)}
-        const block=blocks.find(b=>b.id===bid);
-        if(e.key==="Backspace"&&block){const s=block.supports.find(s=>s.id===sid);if(s?.text===""&&block.supports.length>1){e.preventDefault();removeSupport(bid,sid);const pi=Math.max(0,idx-1);const pid=block.supports[pi]?.id;if(pid&&pid!==sid)setTimeout(()=>iRefs.current[pid]?.focus(),50)}}
-      };
-
-      const [dragS,setDragS]=useState({bid:null,i:null});
-      const [dragOS,setDragOS]=useState({bid:null,i:null});
-      const [dragR,setDragR]=useState(null);
-      const [dragOR,setDragOR]=useState(null);
-      const hdS=(e,bid,i)=>{setDragS({bid,i});e.dataTransfer.effectAllowed="move"};
-      const hdO=(e,bid,i)=>{e.preventDefault();setDragOS({bid,i})};
-      const hdL=()=>setDragOS({bid:null,i:null});
-      const hdD=(e,bid,di)=>{e.preventDefault();if(dragS.bid!==bid||dragS.i===null||dragS.i===di){setDragS({bid:null,i:null});setDragOS({bid:null,i:null});return}setBlocks(p=>p.map(b=>{if(b.id!==bid)return b;const u=[...b.supports];const[m]=u.splice(dragS.i,1);u.splice(di,0,m);return{...b,supports:u}}));setDragS({bid:null,i:null});setDragOS({bid:null,i:null})};
-      const hdE=()=>{setDragS({bid:null,i:null});setDragOS({bid:null,i:null})};
-      const hdRS=(e,i)=>{setDragR(i);e.dataTransfer.effectAllowed="move"};
-      const hdRO=(e,i)=>{e.preventDefault();setDragOR(i)};
-      const hdRL=()=>setDragOR(null);
-      const hdRD=(e,di)=>{e.preventDefault();if(dragR===null||dragR===di){setDragR(null);setDragOR(null);return}setRivals(p=>{const u=[...p];const[m]=u.splice(dragR,1);u.splice(di,0,m);return u});setDragR(null);setDragOR(null)};
-      const hdRE=()=>{setDragR(null);setDragOR(null)};
-
-      const hasAnyLinks=blocks.some(b=>b.supports.some(s=>s.linkedFrom!==null));
-      const getMainBlockId=()=>{if(!hasAnyLinks)return null;const linked=new Set();blocks.forEach(b=>{b.supports.forEach(s=>{if(s.linkedFrom)linked.add(s.linkedFrom)})});const cands=blocks.filter(b=>!linked.has(b.id));if(cands.length===0)return blocks[blocks.length-1].id;return cands[cands.length-1].id};
-      const mainBlockId=getMainBlockId();
-
-      const hasIbeFields=()=>iq.trim()||rivals.some(r=>r.trim());
-      const getConcLabels=()=>{const L={};if(isSimple){L[blocks[0].id]=hasIbeFields()?"C1":"C";return L}let ti=0;blocks.forEach(b=>{if(b.id===mainBlockId){L[b.id]=hasIbeFields()?"C1":"C"}else{L[b.id]=hasIbeFields()?`C1${letterLabel(ti)}`:`C${letterLabel(ti)}`;ti++}});return L};
-      const concLabels=getConcLabels();
-
-      const getTopoOrder=()=>{const deps={};blocks.forEach(b=>{deps[b.id]=[]});blocks.forEach(b=>{b.supports.forEach(s=>{if(s.linkedFrom&&deps[b.id])deps[b.id].push(s.linkedFrom)})});const vis=new Set();const ord=[];const visit=id=>{if(vis.has(id))return;vis.add(id);(deps[id]||[]).forEach(visit);ord.push(id)};blocks.forEach(b=>visit(b.id));return ord};
-      const topoOrder=isSimple?[blocks[0].id]:getTopoOrder();
-
-      const getGNums=()=>{let c=1;const m={};topoOrder.forEach(bid=>{const block=blocks.find(b=>b.id===bid);if(block)block.supports.forEach(s=>{m[s.id]=c++})});return m};
-      const gNums=getGNums();
-
-      const mkSep=(mx,diag)=>diag?("=".repeat(mx-1)+"d"):"-".repeat(mx);
-      const getMainConclusionLabel=()=>hasIbeFields()?"C1":"C";
-      const appendIbeFields=core=>{
-        const out=[core];
-        if(iq.trim())out.push("",`IQ: ${iq}`);
-        const filledRivals=rivals.filter(r=>r.trim());
-        if(filledRivals.length>0){
-          out.push("","Rivals:");
-          filledRivals.forEach((r,i)=>out.push(`C${i+2}. ${r}`));
-        }
-        return out.join("\n");
-      };
-      const buildOutput=()=>{
-        const gn=getGNums();const cL=getConcLabels();
-        if(isSimple){const block=blocks[0];const cLabel=getMainConclusionLabel();const sL=block.supports.map(s=>`S${gn[s.id]}. ${s.text}`);const cLine=`${cLabel}. ${block.conclusion}`;const all=[...sL,cLine];const mx=Math.max(...all.map(l=>l.length),10);return appendIbeFields([...sL,mkSep(mx,block.diagnostic),cLine].join("\n"))}
-        const order=getTopoOrder();
-        const isLinear=()=>{if(order.length<=1)return true;for(const bid of order){let fc=0;blocks.forEach(b=>{b.supports.forEach(s=>{if(s.linkedFrom===bid)fc++})});if(fc>1)return false}return true};
-        if(isLinear()&&order.length>1){
-          const res=[];let ci=0;
-          for(let oi=0;oi<order.length;oi++){
-            const bid=order[oi];const block=blocks.find(b=>b.id===bid);if(!block)continue;
-            const cl=cL[bid];const pad=" ".repeat(ci);
-            let skipId=null;if(oi>0){const prevBid=order[oi-1];const ls=block.supports.find(s=>s.linkedFrom===prevBid);if(ls)skipId=ls.id}
-            block.supports.filter(s=>s.id!==skipId).forEach(s=>{const num=gn[s.id];let text=s.text;if(s.linkedFrom){const fb=blocks.find(b=>b.id===s.linkedFrom);const fl=cL[s.linkedFrom]||"?";text=(fb?.conclusion||`[${fl}]`)+` [= ${fl}]`}res.push(`${pad}S${num}. ${text}`)});
-            const allSL=block.supports.map(s=>{const num=gn[s.id];let text=s.text;if(s.linkedFrom){const fb=blocks.find(b=>b.id===s.linkedFrom);const fl=cL[s.linkedFrom]||"?";text=(fb?.conclusion||`[${fl}]`)+` [= ${fl}]`}return`${pad}S${num}. ${text}`});
-            const cLine=`${pad}${cl}. ${block.conclusion}`;const allLines=[...allSL,cLine];const mx=Math.max(...allLines.map(l=>l.length),ci+10);const sepW=mx-ci;const sep=block.diagnostic?("=".repeat(sepW-1)+"d"):"-".repeat(sepW);res.push(pad+sep);
-            if(oi<order.length-1){const nBid=order[oi+1];const nBlock=blocks.find(b=>b.id===nBid);const ls=nBlock?.supports.find(s=>s.linkedFrom===bid);if(ls){const arrow="  ------->  ";const ln=gn[ls.id];const ll=cL[bid];res.push(`${cLine}${arrow}S${ln}. ${block.conclusion} [= ${ll}]`);ci=cLine.length+arrow.length}else{res.push(cLine);res.push("")}}else{res.push(cLine)}
-          }
-          return appendIbeFields(res.join("\n"));
-        }
-        const res=[];
-        for(let oi=0;oi<order.length;oi++){
-          const bid=order[oi];const block=blocks.find(b=>b.id===bid);if(!block)continue;const cl=cL[bid];if(oi>0)res.push("");
-          const sLines=block.supports.map(s=>{const num=gn[s.id];let text=s.text;if(s.linkedFrom){const fb=blocks.find(b=>b.id===s.linkedFrom);const fl=cL[s.linkedFrom]||"?";text=(fb?.conclusion||`[${fl}]`)+` [= ${fl}]`}return`S${num}. ${text}`});
-          const cLine=`${cl}. ${block.conclusion}`;const allLines=[...sLines,cLine];const mx=Math.max(...allLines.map(l=>l.length),10);
-          sLines.forEach(l=>res.push(l));res.push(mkSep(mx,block.diagnostic));
-          let feedsInto=null;blocks.forEach(b=>{b.supports.forEach(s=>{if(s.linkedFrom===bid)feedsInto={tid:b.id,sid:s.id}})});
-          if(feedsInto){const tl=cL[feedsInto.tid];const tn=gn[feedsInto.sid];const isM=feedsInto.tid===mainBlockId;res.push(`${cLine}  -------> S${tn} of ${isM?"Main Argument":`Argument ${tl}`}`)}else{res.push(cLine)}
-        }
-        return appendIbeFields(res.join("\n"));
-      };
-
-      const handleCopy=async()=>{try{await navigator.clipboard.writeText(buildOutput())}catch(e){const ta=document.createElement("textarea");ta.value=buildOutput();document.body.appendChild(ta);ta.select();document.execCommand("copy");document.body.removeChild(ta)}setCopied(true);setTimeout(()=>setCopied(false),2000)};
-      const handleDownload=()=>{const b=new Blob([buildOutput()],{type:"text/plain"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="schematized_argument.txt";a.click()};
-      const handleClear=()=>{setBlocks([{id:uid(),supports:[{id:uid(),text:"",linkedFrom:null}],conclusion:"",diagnostic:false}]);setIq("");setRivals([""])};
-      const hasContent=blocks.some(b=>b.supports.some(s=>s.text.trim()||s.linkedFrom)||b.conclusion.trim())||iq.trim()||rivals.some(r=>r.trim());
-
-      const linkableBlocks=cid=>{const gd=(bid,v=new Set())=>{if(v.has(bid))return v;v.add(bid);blocks.forEach(b=>{b.supports.forEach(s=>{if(s.linkedFrom===bid)gd(b.id,v)})});return v};const d=gd(cid);return blocks.filter(b=>b.id!==cid&&!d.has(b.id))};
-
-      const XIcon=<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>;
-      const ArrowIcon=<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#e9171f" strokeWidth="1.5" strokeLinecap="round" style={{flexShrink:0}}><path d="M1 7h12M9 3l4 4-4 4"/></svg>;
-
-      const renderIbeFields=()=>(
-        <div style={{marginBottom:28}}>
-          <div style={{marginBottom:16}}>
-            <span style={{...LS,display:"block",marginBottom:10}}>Implicit Question</span>
-            <div style={{...CB,background:"#fff"}}>
-              <span style={{...ML,color:"#d97706",minWidth:30}}>IQ.</span>
-              <input type="text" value={iq} onChange={e=>setIq(e.target.value)}
-                placeholder="What question does the evidence raise?"
-                style={IS}/>
-            </div>
-          </div>
-          <div>
-            <span style={{...LS,display:"block",marginBottom:10}}>Rival Conclusions</span>
-            <div style={{display:"flex",flexDirection:"column",gap:6}}>
-              {rivals.map((r,i)=>(
-                <div key={i} draggable onDragStart={e=>hdRS(e,i)} onDragOver={e=>hdRO(e,i)} onDragLeave={hdRL} onDrop={e=>hdRD(e,i)} onDragEnd={hdRE}
-                  style={{
-                    ...CB,
-                    background:dragR===i?"#fff8e8":"#fff",
-                    border:dragOR===i&&dragR!==i?"2px dashed #e9171f":CB.border,
-                    padding:dragOR===i&&dragR!==i?"1px 11px 1px 1px":"2px 12px 2px 2px",
-                    opacity:dragR===i?0.5:1,
-                    cursor:"grab",
-                  }}>
-                  <DragHandle/>
-                  <span style={{...ML,color:"#6b7280",minWidth:36}}>C{i+2}.</span>
-                  <input type="text" value={r} onChange={e=>updateRival(i,e.target.value)}
-                    placeholder={`Rival explanation ${i+1}...`}
-                    style={IS}/>
-                  {rivals.length>1&&(
-                    <button onClick={()=>removeRival(i)} style={XB}
-                      onMouseEnter={e=>(e.currentTarget.style.color="#e9171f")}
-                      onMouseLeave={e=>(e.currentTarget.style.color="#c0bfcf")}>{XIcon}</button>
-                  )}
-                </div>
-              ))}
-            </div>
-            <AddBtn onClick={addRival} label="Add rival"/>
-          </div>
-        </div>
-      );
-
-      // ── Render support row ──
-      const renderSupport=(block,s,si,simple)=>{
-        const gNum=gNums[s.id];const isLinked=s.linkedFrom!==null;
-        const linkedBlock=isLinked?blocks.find(b=>b.id===s.linkedFrom):null;
-        const linkedCLabel=isLinked?concLabels[s.linkedFrom]:"";
-        const avail=linkableBlocks(block.id);
-        return (
-          <div key={s.id} style={{display:"flex",flexDirection:"column",gap:4}}>
-            <div draggable onDragStart={e=>hdS(e,block.id,si)} onDragOver={e=>hdO(e,block.id,si)} onDragLeave={hdL} onDrop={e=>hdD(e,block.id,si)} onDragEnd={hdE}
-              style={{display:"flex",alignItems:"center",gap:8,background:dragS.bid===block.id&&dragS.i===si?"#fff8e8":simple?"#fff":"#f8f7f4",borderRadius:8,border:dragOS.bid===block.id&&dragOS.i===si&&dragS.i!==si?"2px dashed #e9171f":"1px solid "+(simple?"#d8dbdc":"#eceaef"),padding:"2px 8px 2px 2px",opacity:dragS.bid===block.id&&dragS.i===si?0.5:1,cursor:"grab"}}>
-              <DragHandle/>
-              <span style={{...ML,color:"#e9171f",minWidth:simple?30:36}}>S{gNum}.</span>
-              {isLinked ? (
-                <div style={{flex:1,padding:"10px 4px",fontSize:14,color:"#e9171f",display:"flex",alignItems:"center",gap:6,minWidth:0}}>
-                  {ArrowIcon}
-                  <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                    {linkedBlock?.conclusion||`[${linkedCLabel}]`}
-                    <span style={{color:"#b4babc",fontWeight:600,marginLeft:4,fontSize:12}}>[= {linkedCLabel}]</span>
-                  </span>
-                </div>
-              ) : (
-                <input ref={el=>(iRefs.current[s.id]=el)} type="text" value={s.text}
-                  onChange={e=>updateSupport(block.id,s.id,e.target.value)}
-                  onKeyDown={e=>simple?handleKeyDownSimple(e,block.id,s.id,si):handleKeyDown(e,block.id)}
-                  placeholder="Enter a support statement..." style={IS}/>
-              )}
-              {block.supports.length>1&&(
-                <button onClick={()=>removeSupport(block.id,s.id)} style={XB}
-                  onMouseEnter={e=>(e.currentTarget.style.color="#e9171f")}
-                  onMouseLeave={e=>(e.currentTarget.style.color="#c0bfcf")}>{XIcon}</button>
-              )}
-            </div>
-            {!isSimple&&avail.length>0&&!isLinked&&(
-              <div style={{display:"flex",gap:4,paddingLeft:52,flexWrap:"wrap"}}>
-                {avail.map(lb=>(
-                  <button key={lb.id} onClick={()=>toggleLink(block.id,s.id,lb.id)} style={{fontSize:11,color:"#b4babc",background:"none",border:"1px dashed #b4babc",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s"}}
-                    onMouseEnter={e=>{e.currentTarget.style.borderColor="#e9171f";e.currentTarget.style.color="#e9171f"}}
-                    onMouseLeave={e=>{e.currentTarget.style.borderColor="#b4babc";e.currentTarget.style.color="#b4babc"}}>
-                    ← Link {concLabels[lb.id]}
-                  </button>
-                ))}
-              </div>
-            )}
-            {!isSimple&&isLinked&&(
-              <div style={{paddingLeft:52}}>
-                <button onClick={()=>toggleLink(block.id,s.id,s.linkedFrom)} style={{fontSize:11,color:"#e9171f",background:"none",border:"1px dashed #f0c0c0",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"inherit"}}>Unlink</button>
-              </div>
-            )}
-          </div>
-        );
-      };
-
-      // ── SIMPLE ──
-      if(isSimple){
-        const block=blocks[0];const filled=block.supports.filter(s=>s.text.trim()).length;const hasC=block.conclusion.trim().length>0;
-        return (
-          <div style={{minHeight:"100vh",background:"#f8f7f4",fontFamily:"'Segoe UI',system-ui,-apple-system,sans-serif",padding:"24px 16px",boxSizing:"border-box"}}>
-            <div style={{maxWidth:720,margin:"0 auto"}}>
-              <div style={{marginBottom:20}}>
-                <h1 style={{fontSize:22,fontWeight:700,color:"#000000",margin:"0 0 4px 0",letterSpacing:"-0.3px"}}>Schematized Argument Builder</h1>
-                <p style={{fontSize:14,color:"#b4babc",margin:0,lineHeight:1.5}}>Add your support statements below and fill in the conclusion. Drag to reorder. Press <strong>Enter</strong> to add a new line.</p>
-                <p style={{fontSize:11,color:"#b4babc",margin:"4px 0 0 0",lineHeight:1.4}}>{saveState}</p>
-              </div>
-              <div style={{marginBottom:4}}>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                  <span style={LS}>Support Statements</span>
-                  <span style={{fontSize:12,color:"#b4babc"}}>{filled} statement{filled!==1?"s":""}</span>
-                </div>
-                <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                  {block.supports.map((s,i)=>renderSupport(block,s,i,true))}
-                </div>
-                <AddBtn onClick={()=>addSupport(block.id)} label="Add support"/>
-              </div>
-              <div style={{display:"flex",alignItems:"center",gap:10,margin:"20px 0"}}>
-                <div style={{flex:1,display:"flex",alignItems:"center"}}>
-                  <div style={{flex:1,borderTop:block.diagnostic?"3px double #000000":"2.5px dashed #000000"}}/>
-                  {block.diagnostic&&<span style={{fontFamily:MF,fontSize:13,fontWeight:700,color:"#000",paddingLeft:4}}>d</span>}
-                </div>
-                <label style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer",userSelect:"none",fontSize:12,color:block.diagnostic?"#e9171f":"#b4babc",fontWeight:600,transition:"color 0.15s",flexShrink:0}}>
-                  <input type="checkbox" checked={block.diagnostic} onChange={()=>toggleDiagnostic(block.id)} style={{accentColor:"#e9171f",width:13,height:13,cursor:"pointer"}}/>
-                  Diagnostic
-                </label>
-              </div>
-              <div style={{marginBottom:28}}>
-                <span style={{...LS,display:"block",marginBottom:10}}>Conclusion</span>
-                <div style={{...CB,background:"#fff"}}>
-                  <span style={{...ML,color:"#e9171f"}}>{getMainConclusionLabel()}.</span>
-                  <input type="text" value={block.conclusion} onChange={e=>updateConclusion(block.id,e.target.value)} placeholder="Enter the conclusion..." style={IS}/>
-                </div>
-              </div>
-              {renderIbeFields()}
-              {hasContent&&(
-                <div style={{background:"#fff",border:"1px solid #d8dbdc",borderRadius:10,padding:"18px 20px",marginBottom:20}}>
-                  <span style={{...LS,display:"block",marginBottom:12}}>Preview</span>
-                  <pre style={{fontFamily:MF,fontSize:14,lineHeight:1.7,color:"#000000",margin:0,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{buildOutput()}</pre>
-                </div>
-              )}
-              <ActBtns copied={copied} onCopy={handleCopy} onDownload={handleDownload} onClear={handleClear} disabled={!hasContent}/>
-              <div style={{marginTop:24,borderTop:"1px solid #d8dbdc",paddingTop:20}}>
-                <button onClick={addBlock} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,width:"100%",padding:"12px",background:"none",border:"2px dashed #b4babc",borderRadius:12,color:"#b4babc",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s"}}
-                  onMouseEnter={e=>{e.currentTarget.style.borderColor="#e9171f";e.currentTarget.style.color="#e9171f"}}
-                  onMouseLeave={e=>{e.currentTarget.style.borderColor="#b4babc";e.currentTarget.style.color="#b4babc"}}>
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
-                  Add argument
-                </button>
-                <p style={{fontSize:12,color:"#b4babc",marginTop:8,textAlign:"center"}}>Add another argument to build a complex argument with tributaries.</p>
-              </div>
-              <p style={{fontSize:12,color:"#b4babc",marginTop:24,textAlign:"center",lineHeight:1.5}}>Tip: Press <strong>Enter</strong> to add a new support line. Press <strong>Backspace</strong> on an empty line to remove it.</p>
-            </div>
-          </div>
-        );
-      }
-
-      // ── COMPLEX ──
-      return (
-        <div style={{minHeight:"100vh",background:"#f8f7f4",fontFamily:"'Segoe UI',system-ui,-apple-system,sans-serif",padding:"24px 16px",boxSizing:"border-box"}}>
-          <div style={{maxWidth:720,margin:"0 auto"}}>
-            <div style={{marginBottom:20}}>
-              <h1 style={{fontSize:22,fontWeight:700,color:"#000000",margin:"0 0 4px 0",letterSpacing:"-0.3px"}}>Schematized Argument Builder</h1>
-              <p style={{fontSize:14,color:"#b4babc",margin:0,lineHeight:1.5}}>Build your complex argument. Link conclusions to support slots to connect tributaries.</p>
-              <p style={{fontSize:11,color:"#b4babc",margin:"4px 0 0 0",lineHeight:1.4}}>{saveState}</p>
-            </div>
-            {blocks.map(block=>{
-              const isMain=block.id===mainBlockId;const cLabel=concLabels[block.id];
-              return (
-                <div key={block.id} style={{background:"#fff",border:isMain?"2px solid #e9171f":"1px solid #d8dbdc",borderRadius:12,padding:"16px 18px",marginBottom:12}}>
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-                    <span style={{background:isMain?"#e9171f":"#e9171f",color:"#fff",fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20,letterSpacing:"0.5px",textTransform:"uppercase"}}>
-                      {isMain?"Main Argument":hasAnyLinks?`Tributary argument ${cLabel.slice(1)}`:`Argument ${cLabel.slice(1)}`}
-                    </span>
-                    {blocks.length>1&&(
-                      <button onClick={()=>removeBlock(block.id)} style={SB}
-                        onMouseEnter={e=>{e.currentTarget.style.color="#e9171f";e.currentTarget.style.borderColor="#e9171f"}}
-                        onMouseLeave={e=>{e.currentTarget.style.color="#b4babc";e.currentTarget.style.borderColor="#d8dbdc"}}>Remove</button>
-                    )}
-                  </div>
-                  <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:8}}>
-                    {block.supports.map((s,si)=>renderSupport(block,s,si,false))}
-                  </div>
-                  <AddBtn onClick={()=>addSupport(block.id)} label="Add support"/>
-                  <div style={{display:"flex",alignItems:"center",gap:10,margin:"14px 0"}}>
-                    <div style={{flex:1,display:"flex",alignItems:"center"}}>
-                      <div style={{flex:1,borderTop:block.diagnostic?"3px double #000000":"2.5px dashed #000000"}}/>
-                      {block.diagnostic&&<span style={{fontFamily:MF,fontSize:13,fontWeight:700,color:"#000",paddingLeft:4}}>d</span>}
-                    </div>
-                    <label style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer",userSelect:"none",fontSize:12,color:block.diagnostic?"#e9171f":"#b4babc",fontWeight:600,transition:"color 0.15s",flexShrink:0}}>
-                      <input type="checkbox" checked={block.diagnostic} onChange={()=>toggleDiagnostic(block.id)} style={{accentColor:"#e9171f",width:13,height:13,cursor:"pointer"}}/>
-                      Diagnostic
-                    </label>
-                  </div>
-                  <div style={{...CB,background:"#f8f7f4"}}>
-                    <span style={{...ML,color:isMain?"#e9171f":"#d97706",minWidth:30}}>{cLabel}.</span>
-                    <input type="text" value={block.conclusion} onChange={e=>updateConclusion(block.id,e.target.value)}
-                      placeholder={isMain?"Enter the main conclusion...":`Enter conclusion ${cLabel.slice(1)}...`} style={IS}/>
-                  </div>
-                </div>
-              );
-            })}
-            <button onClick={addBlock} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,width:"100%",padding:"12px",background:"none",border:"2px dashed #b4babc",borderRadius:12,color:"#b4babc",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginBottom:24,transition:"all 0.15s"}}
-              onMouseEnter={e=>{e.currentTarget.style.borderColor="#e9171f";e.currentTarget.style.color="#e9171f"}}
-              onMouseLeave={e=>{e.currentTarget.style.borderColor="#b4babc";e.currentTarget.style.color="#b4babc"}}>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
-              Add argument
-            </button>
-            {renderIbeFields()}
-            {hasContent&&(
-              <div style={{background:"#fff",border:"1px solid #d8dbdc",borderRadius:10,padding:"18px 20px",marginBottom:20}}>
-                <span style={{...LS,display:"block",marginBottom:12}}>Preview</span>
-                <pre style={{fontFamily:MF,fontSize:13,lineHeight:1.6,color:"#000000",margin:0,whiteSpace:"pre",overflowX:"auto"}}>{buildOutput()}</pre>
-              </div>
-            )}
-            <ActBtns copied={copied} onCopy={handleCopy} onDownload={handleDownload} onClear={handleClear} disabled={!hasContent}/>
-            <p style={{fontSize:12,color:"#b4babc",marginTop:24,textAlign:"center",lineHeight:1.5}}>Tip: Press <strong>Enter</strong> to add a new support line. Use the link buttons to connect a tributary conclusion into a support slot.</p>
-          </div>
-        </div>
-      );
-    }
-
-    ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
-  </script>
-
-<!-- ===== FEEDBACK BUTTON ===== -->
-<button id="feedback-btn" aria-label="Give feedback on this tool" title="Feedback"
-  onclick="window.open('https://airtable.com/appxdI0VPvkKlM8u1/pag4PguwP8nUxPA3p/form','_blank')">
-  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-    style="vertical-align: middle; margin-right: 5px;">
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-  </svg>
-  Feedback
-</button>
-
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Build a schematized argument line by line: support statements above the inference line, the conclusion below, tributary arguments linked into the main one. Copy or download the result as plain text. No sign-in.">
+<title>Schematized Argument Builder</title>
+<link rel="canonical" href="https://maxwellunlimited.com/schematized.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Maxwell Unlimited">
+<meta property="og:title" content="Schematized Argument Builder">
+<meta property="og:description" content="Build a schematized argument line by line: support statements above the inference line, the conclusion below, tributary arguments linked into the main one. Copy or download the result as plain text. No sign-in.">
+<meta property="og:url" content="https://maxwellunlimited.com/schematized.html">
+<meta property="og:image" content="https://maxwellunlimited.com/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The Maxwell Unlimited wordmark beside Diagram 17B, a network of labeled points joined by fine lines.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="https://maxwellunlimited.com/favicon.ico">
+<link rel="apple-touch-icon" href="https://maxwellunlimited.com/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
 <style>
-  #feedback-btn {
-    position: fixed;
-    bottom: 16px;
-    right: 16px;
-    z-index: 9998;
+  /* Maxwell Unlimited house style. Every text pair is at least 4.5:1 and every
+     control edge at least 3:1, in both themes (computed 2026-09-27). */
+  :root {
+    --paper: #f3f0e8;
+    --field: #faf8f3;
+    --ink: #151515;
+    --graphite: #575853;
+    --accent: #173a63;
+    --line: rgba(21, 21, 21, 0.18);
+    --edge: #7a786f;
+    --accent-wash: rgba(23, 58, 99, 0.08);
+    --wrong: #8c2f24;
+    --wrong-wash: rgba(140, 47, 36, 0.08);
+    --right: #1d5c38;
+    --btn-bg: #151515;
+    --btn-fg: #f3f0e8;
+    --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    --sans: "IBM Plex Sans", Arial, Helvetica, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #191917;
+      --field: #211f1c;
+      --ink: #ece9e1;
+      --graphite: #a3a49c;
+      --accent: #8fb3e3;
+      --line: rgba(236, 233, 225, 0.2);
+      --edge: #7d7c75;
+      --accent-wash: rgba(143, 179, 227, 0.1);
+      --wrong: #e2907f;
+      --wrong-wash: rgba(226, 144, 127, 0.1);
+      --right: #7fc79b;
+      --btn-bg: #ece9e1;
+      --btn-fg: #191917;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #191917;
+    --field: #211f1c;
+    --ink: #ece9e1;
+    --graphite: #a3a49c;
+    --accent: #8fb3e3;
+    --line: rgba(236, 233, 225, 0.2);
+    --edge: #7d7c75;
+    --accent-wash: rgba(143, 179, 227, 0.1);
+    --wrong: #e2907f;
+    --wrong-wash: rgba(226, 144, 127, 0.1);
+    --right: #7fc79b;
+    --btn-bg: #ece9e1;
+    --btn-fg: #191917;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html { background: var(--paper); }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:disabled { cursor: not-allowed; opacity: 0.4; }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .sab-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .sab-skip {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform: translateY(-120%);
+    padding: 0.75rem 1rem;
+    background: var(--ink);
+    color: var(--paper);
+    z-index: 10;
+  }
+  .sab-skip:focus { transform: translateY(0); }
+
+  /* ── shell ── */
+  .sab-shell {
+    width: min(100%, 48rem);
+    min-height: 100vh;
+    margin: 0 auto;
+    padding: clamp(1.25rem, 4vw, 3rem) clamp(1rem, 4vw, 2rem);
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: clamp(1.5rem, 4vw, 2.5rem);
+  }
+
+  .sab-masthead {
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .sab-homelink {
+    display: inline-block;
+    color: var(--accent);
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-decoration: none;
+  }
+  .sab-homelink:hover { text-decoration: underline; text-underline-offset: 0.25rem; }
+
+  .sab-eyebrow {
+    margin: 1.1rem 0 0.7rem;
+    color: var(--graphite);
+    font-size: 0.72rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+
+  .sab-title {
+    margin: 0;
+    font-family: var(--sans);
+    font-weight: 400;
+    font-size: clamp(1.85rem, 5.4vw, 2.9rem);
+    line-height: 1.04;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    text-wrap: balance;
+  }
+
+  .sab-main { min-width: 0; }
+
+  .sab-intro {
+    margin: 0;
+    max-width: 38rem;
+    font-family: var(--sans);
+    font-size: 1.02rem;
+    line-height: 1.7;
+  }
+  .sab-intro strong { font-weight: 500; }
+
+  .sab-status {
+    margin: 0.55rem 0 0;
+    color: var(--graphite);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* ── sections ── */
+  .sab-section { margin-top: 2rem; }
+
+  .sab-h2 {
+    margin: 0 0 0.75rem;
+    color: var(--graphite);
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    font-weight: 500;
+    line-height: 1.4;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+
+  .sab-section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+  }
+  .sab-section-head .sab-h2 { margin: 0; }
+
+  .sab-count {
+    color: var(--graphite);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Argument labels keep their case (Cd1, not CD1) inside uppercase headings. */
+  .sab-code { text-transform: none; letter-spacing: 0.02em; }
+
+  /* ── lines ── */
+  .sab-lines {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.45rem;
+  }
+
+  .sab-line { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.35rem; }
+
+  .sab-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    min-height: 2.9rem;
+    padding: 2px 0.35rem 2px 2px;
+    border: 1px solid var(--edge);
+    background: var(--field);
+  }
+
+  /* Rows without move arrows start their label where the arrowed rows do. */
+  .sab-row--solo { padding-left: calc(1.5rem + 0.5rem + 2px); }
+
+  .sab-line .sab-label { cursor: grab; }
+  .sab-row.is-dragging { opacity: 0.5; background: var(--accent-wash); }
+  .sab-row.is-over { outline: 2px dashed var(--accent); outline-offset: 2px; }
+
+  .sab-label {
+    flex: none;
+    min-width: 4.2ch;
+    padding-top: 0.66rem;
+    line-height: 1.4;
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 0.92rem;
+    font-weight: 500;
+    user-select: none;
+  }
+  .sab-label--muted { color: var(--graphite); }
+
+  /* The field grows with its text: a hidden copy of the text (::after) sits in the same grid cell and sets
+     the height, so wrapping follows any change in width, font or text spacing. width 0 + flex-grow keeps
+     the row from growing wider than the screen. */
+  .sab-grow {
+    flex: 1 1 0;
+    width: 0;
+    min-width: 0;
+    display: grid;
+    font-family: var(--sans);
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+  .sab-grow::after { content: attr(data-value); visibility: hidden; }
+  /* Both copies inherit every text setting from .sab-grow, so a user's text-spacing override reaches both. */
+  .sab-grow > .sab-input,
+  .sab-grow::after {
+    grid-area: 1 / 1 / 2 / 2;
+    min-width: 0;
+    padding: 0.6rem 0.25rem;
+    border: 0;
+    font: inherit;
+    letter-spacing: inherit;
+    word-spacing: inherit;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .sab-input {
+    display: block;
+    width: 100%;
+    background: transparent;
+    color: var(--ink);
+    resize: none;
+    overflow: hidden;
+  }
+  .sab-input::placeholder { color: var(--graphite); opacity: 1; }
+  .sab-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @supports selector(:has(*)) {
+    .sab-input:focus-visible { outline: none; }
+    .sab-row:has(.sab-input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+  }
+
+  .sab-move {
+    flex: none;
+    align-self: stretch;
+    display: grid;
+    grid-template-rows: 1fr 1fr;
+    width: 1.5rem;
+  }
+
+  .sab-move-btn {
+    display: grid;
+    place-items: center;
+    width: 1.5rem;
+    min-height: 1.25rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--graphite);
+  }
+  .sab-move-btn:hover { color: var(--accent); background: var(--accent-wash); }
+  .sab-move-btn:focus-visible { outline-offset: -2px; }
+  .sab-move-btn[aria-disabled="true"] { opacity: 0.35; cursor: default; }
+  .sab-move-btn[aria-disabled="true"]:hover { color: var(--graphite); background: none; }
+
+  .sab-x {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--graphite);
+    margin-top: 0.4rem;
+  }
+  .sab-x:hover { color: var(--wrong); }
+
+  .sab-linked {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
+    padding: 0.6rem 0.25rem;
+    color: var(--accent);
+    font-family: var(--sans);
+    font-size: 0.95rem;
+  }
+  .sab-linked svg { flex: none; margin-top: 0.25rem; }
+  /* The restated conclusion wraps like the fields do; its [= Cd1] marker never splits. */
+  .sab-linked-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; line-height: 1.4; }
+  .sab-eq { color: var(--graphite); font-family: var(--mono); font-size: 0.8rem; white-space: nowrap; }
+
+  .sab-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding-left: calc(1.5rem + 0.5rem + 2px);
+  }
+
+  .sab-link,
+  .sab-unlink {
+    padding: 0.3rem 0.6rem;
+    border: 1px dashed var(--edge);
+    background: none;
+    color: var(--graphite);
+    font-family: var(--mono);
+    font-size: 0.76rem;
+  }
+  .sab-link:hover { border-color: var(--accent); color: var(--accent); }
+  .sab-unlink { border-color: var(--wrong); color: var(--wrong); }
+  .sab-unlink:hover { background: var(--wrong-wash); }
+
+  .sab-add {
     display: inline-flex;
     align-items: center;
-    padding: 8px 16px;
-    background-color: #e9171f;
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    font-size: 13px;
-    font-weight: 500;
+    gap: 0.45rem;
+    margin-top: 0.6rem;
+    padding: 0.5rem 0.85rem;
+    border: 1px dashed var(--edge);
+    background: none;
+    color: var(--graphite);
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .sab-add:hover { border-color: var(--accent); color: var(--accent); }
+
+  .sab-add-block {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    margin-top: 0;
+    padding: 0.85rem;
+  }
+
+  /* ── inference line ── */
+  .sab-rule {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 1.25rem 0;
+  }
+  .sab-rule-line { flex: 1; display: flex; align-items: center; }
+  .sab-rule-stroke { flex: 1; border-top: 2px dashed var(--ink); }
+  .sab-rule-line.is-diagnostic .sab-rule-stroke { border-top: 3px double var(--ink); }
+  .sab-rule-d { padding-left: 0.3rem; font-family: var(--mono); font-size: 0.85rem; font-weight: 500; }
+
+  .sab-check {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--graphite);
+    font-size: 0.76rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    transition: background-color 0.2s ease, transform 0.15s ease;
+    user-select: none;
   }
-  #feedback-btn:hover {
-    background-color: #c01016;
-    transform: translateY(-1px);
+  .sab-check.is-on { color: var(--accent); }
+  .sab-check input { width: 1rem; height: 1rem; margin: 0; accent-color: var(--accent); cursor: pointer; }
+
+  /* Opt-in sections (implicit question, rival conclusions), in the toggle-row pattern of Subordination Codes. */
+  .sab-toggle {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    width: fit-content;
+    max-width: 38rem;
+    margin-top: 2rem;
+    color: var(--graphite);
+    font-size: 0.85rem;
+    line-height: 1.55;
+    cursor: pointer;
   }
-  #feedback-btn:focus-visible {
-    outline: 2px solid #fed184;
-    outline-offset: 2px;
+  .sab-toggle input { flex: none; width: 1.05rem; height: 1.05rem; margin: 0.15rem 0 0; accent-color: var(--accent); cursor: pointer; }
+
+  /* ── complex arguments ── */
+  .sab-block {
+    margin: 0 0 0.9rem;
+    padding: 1rem 1rem 1.1rem;
+    border: 1px solid var(--edge);
   }
-  @media (max-width: 600px) {
-    #feedback-btn {
-      bottom: 12px;
-      right: 12px;
-      font-size: 12px;
-      padding: 7px 12px;
-    }
+  .sab-block--main { border: 2px solid var(--ink); }
+
+  .sab-block-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 0.85rem;
+  }
+  .sab-block-head .sab-h2 { margin: 0; }
+  .sab-block--main .sab-block-head .sab-h2 { color: var(--ink); }
+
+  .sab-small {
+    padding: 0.3rem 0.65rem;
+    border: 1px solid var(--edge);
+    background: none;
+    color: var(--graphite);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .sab-small:hover { border-color: var(--wrong); color: var(--wrong); }
+
+  /* ── preview and actions ── */
+  .sab-preview-box {
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--edge);
+    background: var(--field);
+    overflow-x: auto;
+  }
+
+  .sab-pre {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 0.86rem;
+    line-height: 1.7;
+    white-space: pre;
+  }
+  .sab-pre--wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+  .sab-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .sab-action,
+  .sab-ghost,
+  .sab-quiet {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.1rem;
+    border: 1px solid var(--edge);
+    background: none;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .sab-action { border-color: var(--btn-bg); background: var(--btn-bg); color: var(--btn-fg); }
+  .sab-action:hover:enabled { border-color: var(--accent); background: var(--accent); }
+  .sab-ghost { color: var(--ink); }
+  .sab-ghost:hover:enabled { border-color: var(--accent); color: var(--accent); }
+  .sab-quiet { margin-left: auto; color: var(--graphite); }
+  .sab-quiet:hover { border-color: var(--wrong); color: var(--wrong); }
+
+  .sab-connector {
+    margin: 0 0 0.9rem;
+    color: var(--graphite);
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    line-height: 1.5;
+  }
+
+  .sab-preview-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    margin-bottom: 0.75rem;
+  }
+  .sab-preview-head .sab-h2 { margin: 0; }
+  .sab-seg { display: inline-flex; }
+  .sab-seg button {
+    padding: 0.35rem 0.65rem;
+    border: 1px solid var(--edge);
+    background: var(--field);
+    color: var(--graphite);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .sab-seg button + button { border-left: 0; }
+  .sab-seg button[aria-pressed="true"] { border-color: var(--btn-bg); background: var(--btn-bg); color: var(--btn-fg); }
+  .sab-note { margin: 0 0 0.6rem; color: var(--graphite); font-size: 0.78rem; line-height: 1.55; }
+
+  .sab-undo {
+    position: fixed;
+    left: 1rem;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 20;
+    width: fit-content;
+    max-width: 40rem;
+    margin-inline: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 0.55rem 0.55rem 0.55rem 1rem;
+    background: var(--btn-bg);
+    color: var(--btn-fg);
+    font-size: 0.8rem;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  }
+  .sab-undo-btn {
+    padding: 0.4rem 0.8rem;
+    border: 1px solid var(--btn-fg);
+    background: none;
+    color: var(--btn-fg);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .sab-undo-btn:focus-visible { outline: 2px solid var(--btn-fg); outline-offset: 2px; }
+  /* While the Undo bar shows, keep room for it so it never covers the control that has focus. */
+  html.sab-has-undo { scroll-padding-bottom: 7rem; }
+  html.sab-has-undo .sab-shell { padding-bottom: 7rem; }
+
+  .sab-printout { display: none; }
+  @media print {
+    html, body { background: #fff !important; color: #000 !important; }
+    .sab-skip, .sab-masthead, .sab-footer, .sab-undo { display: none !important; }
+    #root > :not(.sab-printout) { display: none !important; }
+    .sab-shell { display: block; min-height: 0; padding: 0; }
+    .sab-printout { display: block !important; margin: 0; white-space: pre-wrap; color: #000; font: 10.5pt/1.6 "IBM Plex Mono", ui-monospace, monospace; }
+    .sab-printout--pre { white-space: pre !important; }
+  }
+
+  .sab-more {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--line);
+  }
+
+  .sab-hint,
+  .sab-tip {
+    color: var(--graphite);
+    font-size: 0.8rem;
+    line-height: 1.6;
+  }
+  .sab-hint { margin: 0.55rem 0 0; }
+  .sab-tip { margin: 1.75rem 0 0; }
+  .sab-tip strong { color: var(--ink); font-weight: 500; }
+
+  .sab-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.75rem 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
+    color: var(--graphite);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .sab-footer a { color: var(--accent); text-underline-offset: 0.25rem; }
+
+  @media (max-width: 480px) {
+    .sab-block { padding: 0.85rem 0.7rem 0.95rem; }
+    .sab-quiet { margin-left: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
   }
 </style>
+</head>
+<body>
+<a class="sab-skip" href="#main">Skip to content</a>
+<div class="sab-shell">
+  <header class="sab-masthead">
+    <a class="sab-homelink" id="sab-homelink" href="https://maxwellunlimited.com/workshop.html">← Maxwell Unlimited // Workshop</a>
+    <p class="sab-eyebrow">Argument structure · MU-W-010</p>
+    <h1 class="sab-title">Schematized Argument Builder</h1>
+  </header>
 
+  <main class="sab-main" id="main">
+    <div id="root"></div>
+    <noscript><p class="sab-intro">This tool needs JavaScript. Turn it on and reload the page.</p></noscript>
+  </main>
+
+  <footer class="sab-footer">
+    <span>MU // Workshop</span>
+    <a href="https://airtable.com/appxdI0VPvkKlM8u1/pag4PguwP8nUxPA3p/form" target="_blank" rel="noopener">Send feedback<span class="sab-sr"> (opens in a new tab)</span> <span aria-hidden="true">↗</span></a>
+  </footer>
+</div>
+
+<script>
+  /* Embedded in Canvas, the Workshop link opens a new tab instead of replacing the tool inside the frame. */
+  (function () {
+    var framed = true;
+    try { framed = window.self !== window.top; } catch (e) {}
+    if (!framed) return;
+    var link = document.getElementById("sab-homelink");
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.insertAdjacentHTML("beforeend", '<span class="sab-sr"> (opens in a new tab)</span>');
+  })();
+</script>
+
+<script type="text/babel">
+  const { useState, useRef, useEffect } = React;
+
+  function uid() { return Math.random().toString(36).slice(2, 10); }
+  const STORAGE_KEY = "schematizedArgumentBuilder.student.v2";
+  /* The implicit question and rival conclusions are taught in Module 7, so they start hidden.
+     A link ending in ?rivals opens the builder with them showing. */
+  const IBE_FROM_URL = (() => { try { return new URLSearchParams(window.location.search).has("rivals"); } catch (e) { return false; } })();
+
+  /* ── Argument engine. Shared word for word by the student and instructor editions: change both. ──
+     A block whose conclusion feeds no other block is an argument in its own right; every other block
+     is a tributary. Tributaries print before the argument they feed, in the order of the lines they
+     feed, and S lines are numbered straight through in that order. */
+  const SAB_RULE_MAX = 40;
+
+  function sabStructure(blocks, opts) {
+    const o = opts || {};
+    const byId = {};
+    blocks.forEach(b => { byId[b.id] = b; });
+    const feeds = {};
+    blocks.forEach(b => { feeds[b.id] = []; });
+    blocks.forEach(b => b.supports.forEach((s, si) => {
+      if (s.linkedFrom && byId[s.linkedFrom] && s.linkedFrom !== b.id) feeds[s.linkedFrom].push({ to: b.id, sid: s.id, slot: si });
+    }));
+    const isMain = id => feeds[id].length === 0;
+    const order = [], placed = new Set();
+    const visit = (id, path) => {
+      if (placed.has(id) || path.has(id)) return;
+      path.add(id);
+      byId[id].supports.forEach(s => { if (s.linkedFrom && byId[s.linkedFrom]) visit(s.linkedFrom, path); });
+      path.delete(id);
+      placed.add(id);
+      order.push(id);
+    };
+    blocks.filter(b => isMain(b.id)).forEach(b => visit(b.id, new Set()));
+    blocks.forEach(b => visit(b.id, new Set()));
+    const mains = order.filter(isMain);
+    const kindOf = o.kindOf || (() => "d");
+    /* The owner of the implicit question and rivals: the main argument by default. When it is a diagnostic
+       tributary (the instructor's compound modes), that tributary is always Cd1 and its rivals are Cd2, Cd3, ...
+       (Module 14, AA4), so any other diagnostic tributary is numbered after the highest rival. */
+    const owner = o.ownerOf ? o.ownerOf({ order, mains, byId, isMain, feeds }) : (mains[0] || null);
+    const ownerIsTrib = !!owner && !isMain(owner) && kindOf(byId[owner]) !== "p";
+    const label = {}, count = { d: 0, p: 0 };
+    if (ownerIsTrib) { label[owner] = "Cd1"; count.d = Math.max(1, o.rivalMax || 1); }
+    order.forEach(id => {
+      if (label[id]) return;
+      if (isMain(id)) { label[id] = "C"; return; }
+      const k = kindOf(byId[id]) === "p" ? "p" : "d";
+      count[k] += 1;
+      label[id] = (k === "p" ? "Cp" : "Cd") + count[k];
+    });
+    if (o.rivalsActive && owner && label[owner] === "C") label[owner] = "C1";
+    const rivalPrefix = owner ? label[owner].replace(/\d+$/, "") : "C";
+    const num = {};
+    let n = 1;
+    order.forEach(id => byId[id].supports.forEach(s => { num[s.id] = n++; }));
+    const name = {};
+    order.forEach(id => {
+      if (isMain(id)) name[id] = mains.length === 1 ? (o.mainName ? o.mainName(byId[id]) : "Main Argument") : "Argument " + (mains.indexOf(id) + 1);
+      else name[id] = o.tributaryName ? o.tributaryName(byId[id], label[id]) : "Tributary Argument (" + label[id] + ")";
+    });
+    const connector = {};
+    order.forEach(id => {
+      if (isMain(id)) return;
+      const parts = feeds[id].slice()
+        .sort((a, b) => order.indexOf(a.to) - order.indexOf(b.to) || a.slot - b.slot)
+        .map(f => "S" + num[f.sid] + " of " + (isMain(f.to) ? (mains.length === 1 ? "the main argument" : name[f.to]) : "the argument for " + label[f.to]));
+      connector[id] = label[id] + " becomes " + parts.join(" and ");
+    });
+    const linkedCount = id => byId[id].supports.filter(s => s.linkedFrom && byId[s.linkedFrom]).length;
+    // Side by side needs a single chain in which each argument's first line restates the one before.
+    const chain = order.length > 1 && mains.length === 1 && order.every((id, i) =>
+      (i === order.length - 1 || (feeds[id].length === 1 && feeds[id][0].to === order[i + 1] && feeds[id][0].slot === 0)) && linkedCount(id) === (i === 0 ? 0 : 1));
+    return { order, byId, feeds, isMain, mains, label, num, name, connector, owner, ownerIsTrib, rivalPrefix, chain };
+  }
+
+  function sabLineText(st, s) {
+    if (s.linkedFrom && st.byId[s.linkedFrom]) {
+      const l = st.label[s.linkedFrom];
+      return (st.byId[s.linkedFrom].conclusion || "[" + l + "]") + " [= " + l + "]";
+    }
+    return s.text;
+  }
+
+  function sabRule(width, marker) {
+    return marker === "d" ? "=".repeat(Math.max(1, width - 1)) + "d" : "-".repeat(width);
+  }
+
+  function sabIbeLines(ibe) {
+    if (!ibe) return [];
+    const out = [];
+    if (ibe.iq.trim()) out.push("", ibe.iqHeading + ": " + ibe.iq);
+    const filled = ibe.rivals.filter(r => r.text.trim());
+    if (filled.length) { out.push("", ibe.rivalsHeading); filled.forEach(r => out.push(ibe.prefix + r.n + ". " + r.text)); }
+    return out;
+  }
+
+  /* Stacked layout: each argument under the one it feeds into, short rules, no alignment by spaces.
+     This is the layout that survives a paste into a proportional-font box such as a Canvas reply. */
+  function sabStackedGroups(st, markerOf) {
+    const single = st.order.length === 1;
+    return st.order.map(id => {
+      const b = st.byId[id];
+      const lines = b.supports.map(s => ({ label: "S" + st.num[s.id] + ".", text: sabLineText(st, s) }));
+      const concl = { label: st.label[id] + ".", text: b.conclusion };
+      const width = Math.min(SAB_RULE_MAX, Math.max(10, ...[...lines, concl].map(l => (l.label + " " + l.text).length)));
+      return { heading: single ? null : st.name[id], lines, rule: sabRule(width, markerOf(b)), concl, connector: st.connector[id] || null };
+    });
+  }
+
+  function sabStackedText(st, markerOf, ibe) {
+    const out = [];
+    sabStackedGroups(st, markerOf).forEach((g, i) => {
+      if (i > 0) out.push("");
+      if (g.heading) out.push(g.heading);
+      g.lines.forEach(l => out.push(l.label + " " + l.text));
+      out.push(g.rule);
+      out.push(g.concl.label + " " + g.concl.text);
+      if (g.connector) out.push("▼ " + g.connector);
+    });
+    return [...out, ...sabIbeLines(ibe)].join("\n");
+  }
+
+  /* Side-by-side layout (the Module 14 staircase): only for one chain of arguments, and it needs a
+     fixed-width font, so it suits Download .txt and Canvas's Preformatted style. */
+  function sabStaircaseText(st, markerOf, ibe) {
+    const res = [];
+    let ci = 0;
+    st.order.forEach((id, oi) => {
+      const b = st.byId[id];
+      const pad = " ".repeat(ci);
+      const skip = oi > 0 ? (b.supports.find(s => s.linkedFrom === st.order[oi - 1]) || {}).id : null;
+      const shown = b.supports.filter(s => s.id !== skip).map(s => pad + "S" + st.num[s.id] + ". " + sabLineText(st, s));
+      shown.forEach(l => res.push(l));
+      const cLine = pad + st.label[id] + ". " + b.conclusion;
+      const arrowRow = skip ? [pad + "S" + st.num[skip] + ". " + sabLineText(st, b.supports.find(s => s.id === skip))] : [];
+      const mx = Math.max(...[...shown, ...arrowRow, cLine].map(l => l.length), ci + 10);
+      res.push(pad + sabRule(mx - ci, markerOf(b)));
+      if (oi < st.order.length - 1) {
+        const next = st.byId[st.order[oi + 1]];
+        const ls = next.supports.find(s => s.linkedFrom === id);
+        const arrow = "  ------->  ";
+        res.push(cLine + arrow + "S" + st.num[ls.id] + ". " + sabLineText(st, ls));
+        ci = cLine.length + arrow.length;
+      } else {
+        res.push(cLine);
+      }
+    });
+    return [...res, ...sabIbeLines(ibe)].join("\n");
+  }
+
+  function sabEsc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+  /* The rich-text copy: one paragraph per argument, labels in bold, line breaks as <br>. It relies on
+     tags alone, so it still reads correctly if an editor strips every style. */
+  function sabStackedHtml(st, markerOf, ibe) {
+    const parts = [];
+    sabStackedGroups(st, markerOf).forEach(g => {
+      if (g.heading) parts.push("<p><strong>" + sabEsc(g.heading) + "</strong></p>");
+      const rows = g.lines.map(l => "<strong>" + sabEsc(l.label) + "</strong> " + sabEsc(l.text));
+      rows.push(sabEsc(g.rule));
+      rows.push("<strong>" + sabEsc(g.concl.label) + "</strong> " + sabEsc(g.concl.text));
+      parts.push("<p>" + rows.join("<br>") + "</p>");
+      if (g.connector) parts.push("<p>▼ " + sabEsc(g.connector) + "</p>");
+    });
+    if (ibe) {
+      if (ibe.iq.trim()) parts.push("<p><strong>" + sabEsc(ibe.iqHeading) + ":</strong> " + sabEsc(ibe.iq) + "</p>");
+      const filled = ibe.rivals.filter(r => r.text.trim());
+      if (filled.length) parts.push("<p><strong>" + sabEsc(ibe.rivalsHeading) + "</strong><br>" +
+        filled.map(r => "<strong>" + sabEsc(ibe.prefix + r.n) + ".</strong> " + sabEsc(r.text)).join("<br>") + "</p>");
+    }
+    return parts.join("\n");
+  }
+
+  function sabPreHtml(text) { return "<pre>" + sabEsc(text) + "</pre>"; }
+
+  /* Copy both a plain-text and a rich-text version. Inside a Canvas iframe the async clipboard is
+     usually blocked, so fall back to copying a hidden rich-text selection, then to plain text. */
+  async function sabCopy(text, html) {
+    try {
+      if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+        await navigator.clipboard.write([new ClipboardItem({
+          "text/plain": new Blob([text], { type: "text/plain" }),
+          "text/html": new Blob([html], { type: "text/html" }),
+        })]);
+        return true;
+      }
+    } catch (e) { /* fall through */ }
+    try {
+      const box = document.createElement("div");
+      box.innerHTML = html;
+      box.style.cssText = "position:fixed;left:-9999px;top:0;";
+      document.body.appendChild(box);
+      const range = document.createRange();
+      range.selectNodeContents(box);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      const ok = document.execCommand("copy");
+      sel.removeAllRanges();
+      document.body.removeChild(box);
+      if (ok) return true;
+    } catch (e) { /* fall through */ }
+    try { await navigator.clipboard.writeText(text); return true; } catch (e) { return false; }
+  }
+
+  /* Rivals keep their label (the n in C2, Cd2) when they move; deleting one renumbers the ones after it. */
+  function sabNewRival(n) { return { id: uid(), n, text: "" }; }
+  function sabNormRivals(arr) {
+    if (!Array.isArray(arr) || arr.length === 0) return [sabNewRival(2)];
+    // Drafts from before 2026-09-27 stored plain strings and printed the filled ones as C2, C3, ...
+    if (arr.every(r => typeof r === "string")) {
+      const filled = arr.filter(t => t.trim());
+      return filled.length ? filled.map((t, i) => ({ id: uid(), n: i + 2, text: t })) : [sabNewRival(2)];
+    }
+    return arr.map((r, i) => (typeof r === "string"
+      ? { id: uid(), n: i + 2, text: r }
+      : { id: (r && r.id) || uid(), n: r && Number.isInteger(r.n) && r.n >= 2 ? r.n : i + 2, text: r && typeof r.text === "string" ? r.text : "" }));
+  }
+  function sabNextRivalN(rivals) { return rivals.reduce((m, r) => Math.max(m, r.n), 1) + 1; }
+  function sabRivalMax(rivals) { return rivals.reduce((m, r) => Math.max(m, r.n), 1); }
+  /* A rival added below another takes the next number and pushes the later ones up, so labels stay in order. */
+  function sabInsertRival(rivals, afterIndex) {
+    const at = afterIndex === undefined ? rivals.length - 1 : afterIndex;
+    const n = at < 0 ? 2 : rivals[at].n + 1;
+    const list = rivals.map(r => (r.n >= n ? { ...r, n: r.n + 1 } : r));
+    const r = sabNewRival(n);
+    list.splice(at + 1, 0, r);
+    return { list, r };
+  }
+  /* After a rival is removed, the ones numbered above it move down one. */
+  function sabRemoveRival(rivals, id) {
+    const gone = rivals.find(r => r.id === id);
+    return rivals.filter(r => r.id !== id).map(r => (gone && r.n > gone.n ? { ...r, n: r.n - 1 } : r));
+  }
+  function sabComposing(e) { return !!((e.nativeEvent && e.nativeEvent.isComposing) || e.keyCode === 229); }
+
+  /* ── Icons: decorative. Every button that carries one also has a text or aria-label name. ── */
+  const UpIcon = <svg aria-hidden="true" width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="1,5 5,1 9,5"/></svg>;
+  const DownIcon = <svg aria-hidden="true" width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="1,1 5,5 9,1"/></svg>;
+  const XIcon = <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>;
+  const PlusIcon = <svg aria-hidden="true" width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg>;
+  const CopyIcon = <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="5" width="9" height="9" rx="1"/><path d="M3 11V3a1.5 1.5 0 0 1 1.5-1.5H11"/></svg>;
+  const CheckIcon = <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="3,9 6,12 13,4"/></svg>;
+  const DownloadIcon = <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v8m0 0l-3-3m3 3l3-3"/><path d="M2 12v1.5a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V12"/></svg>;
+  const PrintIcon = <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6V2h8v4"/><rect x="2" y="6" width="12" height="6" rx="1"/><path d="M4 10h8v4H4z"/></svg>;
+  const ArrowIcon = <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M1 7h12M9 3l4 4-4 4"/></svg>;
+
+  /* Up and down buttons: the keyboard, touch and screen-reader route for reordering.
+     Arrow keys work on them too. With a mouse, a line can also be dragged by its number. */
+  function MoveButtons({ id, label, index, count, onMove, onGrip }) {
+    if (count < 2) return <span className="sab-move" aria-hidden="true"></span>;
+    const first = index === 0, last = index === count - 1;
+    const keys = which => e => {
+      if (e.key === "ArrowUp") { e.preventDefault(); onMove(-1, which); }
+      else if (e.key === "ArrowDown") { e.preventDefault(); onMove(1, which); }
+    };
+    return (
+      <span className="sab-move" onMouseDown={onGrip}>
+        <button type="button" id={`${id}-up`} className="sab-move-btn" aria-label={`Move ${label} up`}
+          aria-disabled={first ? "true" : undefined} onClick={() => onMove(-1, "up")} onKeyDown={keys("up")}>{UpIcon}</button>
+        <button type="button" id={`${id}-down`} className="sab-move-btn" aria-label={`Move ${label} down`}
+          aria-disabled={last ? "true" : undefined} onClick={() => onMove(1, "down")} onKeyDown={keys("down")}>{DownIcon}</button>
+      </span>
+    );
+  }
+
+  function AddBtn({ id, onClick, label, className }) {
+    return (
+      <button type="button" id={id} className={"sab-add" + (className ? " " + className : "")} onClick={onClick}>
+        {PlusIcon}<span>{label}</span>
+      </button>
+    );
+  }
+
+  /* A one-line-looking field that wraps and grows. Its height comes from CSS (a hidden copy of the text in
+     the same grid cell), so it follows any change in width, font or text spacing. Line breaks are not
+     allowed inside a line: a pasted break becomes a space and the caret stays after the pasted text. */
+  function Field({ id, value, onChange, onKeyDown, placeholder }) {
+    const ref = React.useRef(null);
+    const caret = React.useRef(null);
+    React.useLayoutEffect(() => {
+      if (caret.current !== null && ref.current) { ref.current.setSelectionRange(caret.current, caret.current); caret.current = null; }
+    }, [value]);
+    const clean = t => t.replace(/\s*[\r\n]+\s*/g, " ");
+    return (
+      <div className="sab-grow" data-value={(value || placeholder || "") + " "}>
+        <textarea id={id} ref={ref} rows={1} className="sab-input" value={value} placeholder={placeholder}
+          onChange={e => onChange(clean(e.target.value))}
+          onPaste={e => {
+            const t = e.clipboardData && e.clipboardData.getData("text/plain");
+            if (!t || !/[\r\n]/.test(t)) return;
+            e.preventDefault();
+            const el = e.currentTarget, ins = clean(t), a = el.selectionStart, b = el.selectionEnd;
+            caret.current = a + ins.length;
+            onChange(el.value.slice(0, a) + ins + el.value.slice(b));
+          }}
+          onKeyDown={e => {
+            if (e.key === "Enter" && !sabComposing(e)) e.preventDefault();
+            if (onKeyDown) onKeyDown(e);
+          }}/>
+      </div>
+    );
+  }
+
+  function ActBtns({ copied, onCopy, onDownload, onPrint, onClear, disabled }) {
+    return (
+      <div className="sab-actions">
+        <button type="button" className="sab-action" onClick={onCopy} disabled={disabled}>
+          {copied ? <>{CheckIcon}Copied!</> : <>{CopyIcon}Copy to Clipboard</>}
+        </button>
+        <button type="button" className="sab-ghost" onClick={onDownload} disabled={disabled}>
+          {DownloadIcon}Download .txt
+        </button>
+        <button type="button" className="sab-ghost" onClick={onPrint} disabled={disabled}>
+          {PrintIcon}Print
+        </button>
+        <button type="button" className="sab-quiet" onClick={onClear} disabled={disabled}>Clear All</button>
+      </div>
+    );
+  }
+
+  /* Shown after a destructive action until the next ordinary edit. Control+Z or Command+Z works too. */
+  function UndoBar({ entry, onUndo }) {
+    if (!entry) return null;
+    return (
+      <div className="sab-undo" role="region" aria-label="Undo">
+        <span>{entry.label}</span>
+        <button type="button" id="sab-undo-btn" className="sab-undo-btn" onClick={onUndo} aria-keyshortcuts="Control+Z Meta+Z">Undo</button>
+      </div>
+    );
+  }
+
+  function App() {
+    const newSupport = () => ({ id: uid(), text: "", linkedFrom: null });
+    const newBlock = () => ({ id: uid(), supports: [newSupport()], conclusion: "", diagnostic: false });
+    const [blocks, setBlocks] = useState(() => [newBlock()]);
+    const [copied, setCopied] = useState(false);
+    const draftLoadedRef = useRef(false);
+    const saveTimerRef = useRef(null);
+    const isSimple = blocks.length === 1;
+    const [iq, setIq] = useState("");
+    const [rivals, setRivals] = useState(() => sabNormRivals([]));
+    const [showIbe, setShowIbe] = useState(IBE_FROM_URL);
+    const [layout, setLayout] = useState("stacked");
+    const [saveState, setSaveState] = useState("Draft not saved yet");
+
+    /* Screen-reader announcements, and focus that follows the thing the user just acted on.
+       focusSoon takes an element id, or "@" plus a CSS selector. */
+    const [live, setLive] = useState("");
+    const announce = msg => setLive(m => (m === msg ? msg + " " : msg));
+    const focusRef = useRef(null);
+    const focusSoon = id => { focusRef.current = id; };
+    const moveRef = useRef(null);
+    const [armed, setArmed] = useState(null);
+
+    /* Undo: a destructive action saves a snapshot first; the next ordinary edit ends the chance to undo. */
+    const [undo, setUndo] = useState([]);
+    const undoGuard = useRef(false);
+    const pushUndo = (label, focus) => {
+      undoGuard.current = true;
+      setUndo(u => [...u.slice(-19), { label, focus, snap: { blocks, iq, rivals, showIbe } }]);
+      announce(label + " To undo, press Control+Z or Command+Z, or use the Undo button.");
+    };
+    const doUndo = () => {
+      const top = undo[undo.length - 1];
+      if (!top) return false;
+      undoGuard.current = true;
+      setBlocks(top.snap.blocks); setIq(top.snap.iq); setRivals(top.snap.rivals); setShowIbe(top.snap.showIbe);
+      setUndo(u => u.slice(0, -1));
+      announce("Undone.");
+      focusSoon(top.focus || (undo.length > 1 ? "sab-undo-btn" : "@.sab-input"));
+      return true;
+    };
+    const undoRef = useRef(doUndo);
+    undoRef.current = doUndo;
+
+    const skipSaveRef = useRef(1);
+    useEffect(() => {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const draft = JSON.parse(saved);
+          if (draft && Array.isArray(draft.blocks) && draft.blocks.length) {
+            setBlocks(draft.blocks);
+            setIq(typeof draft.iq === "string" ? draft.iq : "");
+            const rv = sabNormRivals(draft.rivals);
+            setRivals(rv);
+            const hasIbeText = (typeof draft.iq === "string" && draft.iq.trim() !== "") || rv.some(r => r.text.trim() !== "");
+            setShowIbe(IBE_FROM_URL || (typeof draft.showIbe === "boolean" ? draft.showIbe : hasIbeText));
+            if (draft.layout === "side") setLayout("side");
+            setSaveState("Draft restored");
+            skipSaveRef.current = 2;
+          }
+        }
+      } catch (err) {
+        console.warn("Could not restore draft:", err);
+        setSaveState("Autosave unavailable");
+      } finally {
+        draftLoadedRef.current = true;
+      }
+    }, []);
+
+    useEffect(() => {
+      if (!draftLoadedRef.current) return;
+      if (skipSaveRef.current > 0) { skipSaveRef.current -= 1; return; }
+      clearTimeout(saveTimerRef.current);
+      setSaveState("Saving...");
+      saveTimerRef.current = setTimeout(() => {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({ blocks, iq, rivals, showIbe, layout }));
+          setSaveState("Autosaved");
+        } catch (err) {
+          console.warn("Could not save draft:", err);
+          setSaveState("Autosave unavailable");
+        }
+      }, 350);
+      return () => clearTimeout(saveTimerRef.current);
+    }, [blocks, iq, rivals, showIbe, layout]);
+
+    useEffect(() => {
+      if (undoGuard.current) { undoGuard.current = false; return; }
+      setUndo(u => (u.length ? [] : u));
+    }, [blocks, iq, rivals, showIbe]);
+
+    useEffect(() => {
+      const onKey = e => {
+        if (!(e.key === "z" || e.key === "Z") || !(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
+        // Any ordinary edit empties the undo list, so while it holds something the shortcut can act anywhere.
+        const t = e.target;
+        if (t && t.classList && (t.classList.contains("sab-textarea") || t.id === "sab-custom")) return;
+        if (undoRef.current()) e.preventDefault();
+      };
+      const disarm = () => setArmed(null);
+      window.addEventListener("keydown", onKey);
+      window.addEventListener("mouseup", disarm);
+      return () => { window.removeEventListener("keydown", onKey); window.removeEventListener("mouseup", disarm); };
+    }, []);
+
+    useEffect(() => { document.documentElement.classList.toggle("sab-has-undo", undo.length > 0); }, [undo.length]);
+
+    useEffect(() => {
+      const id = focusRef.current;
+      if (!id) return;
+      focusRef.current = null;
+      const el = id.startsWith("@") ? document.querySelector(id.slice(1)) : document.getElementById(id);
+      if (el) el.focus();
+    });
+
+    const hasIbeFields = () => showIbe && (iq.trim() !== "" || rivals.some(r => r.text.trim() !== ""));
+    const st = sabStructure(blocks, { rivalsActive: hasIbeFields() });
+    const markerOf = b => (b.diagnostic ? "d" : "");
+    const ibeOut = showIbe ? { iq, rivals, prefix: st.rivalPrefix, iqHeading: "IQ", rivalsHeading: "Rivals:" } : null;
+    const useSide = !isSimple && layout === "side" && st.chain;
+    const outputText = () => (useSide ? sabStaircaseText(st, markerOf, ibeOut) : sabStackedText(st, markerOf, ibeOut));
+    const sideFitsPage = useSide && outputText().split("\n").every(l => l.length <= 90);
+    const printText = () => (sideFitsPage ? outputText() : sabStackedText(st, markerOf, ibeOut));
+    const outputHtml = () => (useSide ? sabPreHtml(outputText()) : sabStackedHtml(st, markerOf, ibeOut));
+    const lineLabel = s => "S" + st.num[s.id];
+    const supportFocusId = s => (s.linkedFrom ? `sab-s-${s.id}-unlink` : `sab-s-${s.id}`);
+
+    useEffect(() => {
+      const mv = moveRef.current;
+      if (!mv) return;
+      moveRef.current = null;
+      if (mv.kind === "s") announce(`Moved to S${st.num[mv.id]}.`);
+      else if (mv.kind === "trib") announce(`Tributary ${st.label[mv.tid]} added for S${st.num[mv.sid]}. Its conclusion is that line. Add its support.`);
+      else announce(mv.text);
+    }, [blocks, rivals]);
+
+    const addBlock = () => {
+      const b = newBlock();
+      setBlocks(p => [...p, b]);
+      focusSoon(`sab-s-${b.supports[0].id}`);
+      announce("Separate argument added.");
+    };
+    const toggleDiagnostic = bid => setBlocks(p => p.map(b => (b.id === bid ? { ...b, diagnostic: !b.diagnostic } : b)));
+    const removeBlock = bid => {
+      if (blocks.length === 1) return;
+      pushUndo(`${st.name[bid]} removed.`, `sab-rm-${bid}`);
+      setBlocks(p => p.filter(b => b.id !== bid).map(b => ({ ...b, supports: b.supports.map(s => (s.linkedFrom === bid ? { ...s, linkedFrom: null } : s)) })));
+      focusSoon("sab-add-block");
+    };
+    /* Support a line with its own argument: the new tributary goes above the argument it feeds,
+       its conclusion starts as the line's text, and the line restates it. */
+    const addTributary = (bid, sid) => {
+      const target = blocks.find(b => b.id === bid);
+      const slot = target && target.supports.find(s => s.id === sid);
+      if (!slot) return;
+      const t = newBlock();
+      t.conclusion = slot.text;
+      setBlocks(p => {
+        const next = p.map(b => (b.id === bid ? { ...b, supports: b.supports.map(s => (s.id === sid ? { ...s, linkedFrom: t.id } : s)) } : b));
+        next.splice(next.findIndex(b => b.id === bid), 0, t);
+        return next;
+      });
+      focusSoon(`sab-s-${t.supports[0].id}`);
+      moveRef.current = { kind: "trib", sid, tid: t.id };
+    };
+    const updateRival = (rid, t) => setRivals(p => p.map(r => (r.id === rid ? { ...r, text: t } : r)));
+    const addRival = afterIndex => {
+      const { list, r } = sabInsertRival(rivals, afterIndex);
+      setRivals(list);
+      focusSoon(`sab-r-${r.id}`);
+    };
+    const removeRival = i => {
+      if (rivals.length < 2) return;
+      const gone = rivals[i];
+      if (gone.text.trim()) pushUndo(`${st.rivalPrefix}${gone.n} removed.`, `sab-r-${gone.id}`);
+      setRivals(p => sabRemoveRival(p, gone.id));
+      const next = rivals[i - 1] || rivals[i + 1];
+      if (next) focusSoon(`sab-r-${next.id}`);
+    };
+    const addSupport = (bid, afterSid) => {
+      const n = newSupport();
+      setBlocks(p => p.map(b => {
+        if (b.id !== bid) return b;
+        const u = [...b.supports];
+        const at = afterSid ? u.findIndex(s => s.id === afterSid) + 1 : u.length;
+        u.splice(at > 0 ? at : u.length, 0, n);
+        return { ...b, supports: u };
+      }));
+      focusSoon(`sab-s-${n.id}`);
+    };
+    const updateSupport = (bid, sid, t) => setBlocks(p => p.map(b => (b.id === bid ? { ...b, supports: b.supports.map(s => (s.id === sid ? { ...s, text: t } : s)) } : b)));
+    const removeSupport = (bid, sid) => setBlocks(p => p.map(b => { if (b.id !== bid || b.supports.length === 1) return b; return { ...b, supports: b.supports.filter(s => s.id !== sid) }; }));
+    // After a line is removed, focus the nearest line that can be typed in, or the conclusion.
+    const focusNear = (block, idx) => {
+      const before = block.supports.slice(0, idx).reverse().find(x => !x.linkedFrom);
+      const after = block.supports.slice(idx + 1).find(x => !x.linkedFrom);
+      const t = before || after;
+      focusSoon(t ? `sab-s-${t.id}` : `sab-c-${block.id}`);
+    };
+    const removeSupportAt = (block, idx) => {
+      if (block.supports.length === 1) return;
+      const s = block.supports[idx];
+      if (s.text.trim() || s.linkedFrom) pushUndo(`${lineLabel(s)} removed.`, supportFocusId(s));
+      removeSupport(block.id, s.id);
+      focusNear(block, idx);
+    };
+    const linkSupport = (bid, sid, fromBid) => {
+      setBlocks(p => p.map(b => (b.id === bid ? { ...b, supports: b.supports.map(s => (s.id === sid ? { ...s, linkedFrom: fromBid } : s)) } : b)));
+      focusSoon(`sab-s-${sid}-unlink`);
+      announce("Linked.");
+    };
+    const unlinkSupport = (bid, s) => {
+      pushUndo(`${lineLabel(s)} unlinked.`, `sab-s-${s.id}-unlink`);
+      setBlocks(p => p.map(b => (b.id === bid ? { ...b, supports: b.supports.map(x => (x.id === s.id ? { ...x, linkedFrom: null } : x)) } : b)));
+      focusSoon(`sab-s-${s.id}`);
+    };
+    const updateConclusion = (bid, t) => setBlocks(p => p.map(b => (b.id === bid ? { ...b, conclusion: t } : b)));
+    const handleSupportKey = (e, block, s, idx) => {
+      if (e.key === "Enter" && !sabComposing(e)) { addSupport(block.id, s.id); return; }
+      if (e.key === "Backspace" && s.text === "" && block.supports.length > 1) {
+        e.preventDefault();
+        removeSupport(block.id, s.id);
+        focusNear(block, idx);
+      }
+    };
+    const handleRivalKey = (e, i, r) => {
+      if (e.key === "Enter" && !sabComposing(e)) { addRival(i); return; }
+      if (e.key === "Backspace" && r.text === "" && rivals.length > 1) { e.preventDefault(); removeRival(i); }
+    };
+
+    /* Reordering without a mouse. Focus stays on the arrow that was used, so repeated presses keep moving the same line. */
+    const moveSupport = (bid, from, dir, which) => {
+      const block = blocks.find(b => b.id === bid);
+      if (!block) return;
+      const to = from + dir;
+      const s = block.supports[from];
+      if (to < 0 || to >= block.supports.length) { announce(`S${st.num[s.id]} is already ${dir < 0 ? "first" : "last"}.`); return; }
+      setBlocks(p => p.map(b => { if (b.id !== bid) return b; const u = [...b.supports]; const [m] = u.splice(from, 1); u.splice(to, 0, m); return { ...b, supports: u }; }));
+      moveRef.current = { kind: "s", id: s.id };
+      focusSoon(`sab-s-${s.id}-${which}`);
+    };
+    const moveRival = (from, dir, which) => {
+      const to = from + dir;
+      const r = rivals[from];
+      const label = st.rivalPrefix + r.n;
+      if (to < 0 || to >= rivals.length) { announce(`${label} is already ${dir < 0 ? "first" : "last"}.`); return; }
+      setRivals(p => { const u = [...p]; const [m] = u.splice(from, 1); u.splice(to, 0, m); return u; });
+      moveRef.current = { kind: "r", text: `${label} is now ${to + 1} of ${rivals.length}.` };
+      focusSoon(`sab-r-${r.id}-${which}`);
+    };
+
+    const [dragS, setDragS] = useState({ bid: null, i: null });
+    const [dragOS, setDragOS] = useState({ bid: null, i: null });
+    const [dragR, setDragR] = useState(null);
+    const [dragOR, setDragOR] = useState(null);
+    const hdS = (e, bid, i, key) => { if (armed !== key) return; setDragS({ bid, i }); e.dataTransfer.effectAllowed = "move"; };
+    const hdO = (e, bid, i) => { if (dragS.bid !== bid) return; e.preventDefault(); setDragOS({ bid, i }); };
+    const hdL = () => { if (dragS.bid !== null) setDragOS({ bid: null, i: null }); };
+    const hdD = (e, bid, di) => { if (dragS.bid === null) return; e.preventDefault(); if (dragS.bid !== bid || dragS.i === null || dragS.i === di) { setDragS({ bid: null, i: null }); setDragOS({ bid: null, i: null }); return; } setBlocks(p => p.map(b => { if (b.id !== bid) return b; const u = [...b.supports]; const [m] = u.splice(dragS.i, 1); u.splice(di, 0, m); return { ...b, supports: u }; })); setDragS({ bid: null, i: null }); setDragOS({ bid: null, i: null }); };
+    const hdE = () => { setDragS({ bid: null, i: null }); setDragOS({ bid: null, i: null }); setArmed(null); };
+    const hdRS = (e, i, key) => { if (armed !== key) return; setDragR(i); e.dataTransfer.effectAllowed = "move"; };
+    const hdRO = (e, i) => { if (dragR === null) return; e.preventDefault(); setDragOR(i); };
+    const hdRL = () => { if (dragR !== null) setDragOR(null); };
+    const hdRD = (e, di) => { if (dragR === null) return; e.preventDefault(); if (dragR === null || dragR === di) { setDragR(null); setDragOR(null); return; } setRivals(p => { const u = [...p]; const [m] = u.splice(dragR, 1); u.splice(di, 0, m); return u; }); setDragR(null); setDragOR(null); };
+    const hdRE = () => { setDragR(null); setDragOR(null); setArmed(null); };
+    /* A row becomes draggable only while the mouse is down on its number or arrows, so text in the field can still be selected. */
+    const grip = key => ({ onMouseDown: () => setArmed(key), onMouseUp: () => setArmed(null) });
+
+    const handleCopy = async () => {
+      const ok = await sabCopy(outputText(), outputHtml());
+      if (ok) { setCopied(true); announce("Copied to clipboard."); setTimeout(() => setCopied(false), 2000); }
+      else announce("Copy did not work here. Select the text in the preview and copy it.");
+    };
+    const handleDownload = () => { const b = new Blob([outputText()], { type: "text/plain" }); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = "schematized_argument.txt"; a.click(); };
+    const handlePrint = () => window.print();
+    const hasContent = blocks.some(b => b.supports.some(s => s.text.trim()) || b.conclusion.trim()) || (showIbe && (iq.trim() || rivals.some(r => r.text.trim())));
+    const handleClear = () => {
+      if (!hasContent) return;
+      pushUndo("Cleared.", "@.sab-input");
+      const b = newBlock();
+      setBlocks([b]); setIq(""); setRivals(sabNormRivals([]));
+      focusSoon(`sab-s-${b.supports[0].id}`);
+    };
+
+    /* Blocks this line may restate: not itself, not an argument downstream of it (that would be a loop),
+       and not one that already feeds this block. */
+    const linkableBlocks = block => {
+      const down = (bid, v = new Set()) => { if (v.has(bid)) return v; v.add(bid); blocks.forEach(b => { b.supports.forEach(s => { if (s.linkedFrom === bid) down(b.id, v); }); }); return v; };
+      const d = down(block.id);
+      return blocks.filter(b => b.id !== block.id && !d.has(b.id) && !block.supports.some(s => s.linkedFrom === b.id));
+    };
+    const linkName = id => (st.isMain(id) ? st.name[id] : st.label[id]);
+    const headingNode = id => {
+      const nm = st.name[id], code = "(" + st.label[id] + ")", i = nm.indexOf(code);
+      return i < 0 ? nm : <>{nm.slice(0, i)}(<span className="sab-code">{st.label[id]}</span>){nm.slice(i + code.length)}</>;
+    };
+
+    const renderIbeFields = () => (
+      <>
+        <label className="sab-toggle">
+          <input type="checkbox" checked={showIbe} onChange={e => setShowIbe(e.target.checked)} aria-controls={showIbe ? "sab-ibe" : undefined}/>
+          <span>Include an implicit question and rival conclusions</span>
+        </label>
+        {showIbe && (
+          <div id="sab-ibe">
+            <div className="sab-section">
+              <h2 className="sab-h2">Implicit Question</h2>
+              <div className="sab-row sab-row--solo">
+                <label className="sab-label" htmlFor="sab-iq"><span className="sab-sr">Implicit question </span>IQ.</label>
+                <Field id="sab-iq" value={iq} onChange={setIq} placeholder="What question does the evidence raise?"/>
+              </div>
+            </div>
+            <div className="sab-section">
+              <h2 className="sab-h2">Rival Conclusions</h2>
+              <ol className="sab-lines" role="list">
+                {rivals.map((r, i) => {
+                  const label = st.rivalPrefix + r.n; const base = `sab-r-${r.id}`;
+                  const cls = "sab-row" + (dragR === i ? " is-dragging" : "") + (dragOR === i && dragR !== i ? " is-over" : "");
+                  return (
+                    <li key={r.id} className="sab-line">
+                      <div className={cls} draggable={armed === "r:" + r.id} onDragStart={e => hdRS(e, i, "r:" + r.id)} onDragOver={e => hdRO(e, i)} onDragLeave={hdRL} onDrop={e => hdRD(e, i)} onDragEnd={hdRE}>
+                        <MoveButtons id={base} label={label} index={i} count={rivals.length} onMove={(dir, which) => moveRival(i, dir, which)} onGrip={grip("r:" + r.id).onMouseDown}/>
+                        <label className="sab-label sab-label--muted" htmlFor={base} {...grip("r:" + r.id)}><span className="sab-sr">Rival conclusion </span>{label}.</label>
+                        <Field id={base} value={r.text} onChange={t => updateRival(r.id, t)} placeholder={`Rival explanation ${i + 1}...`}
+                          onKeyDown={e => handleRivalKey(e, i, r)}/>
+                        {rivals.length > 1 && (
+                          <button type="button" className="sab-x" aria-label={`Remove ${label}`} onClick={() => removeRival(i)}>{XIcon}</button>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+              <AddBtn onClick={() => addRival()} label="Add rival"/>
+            </div>
+          </div>
+        )}
+      </>
+    );
+
+    const renderSupport = (block, s, si) => {
+      const label = lineLabel(s); const base = `sab-s-${s.id}`;
+      const isLinked = !!(s.linkedFrom && st.byId[s.linkedFrom]);
+      const linkedLabel = isLinked ? st.label[s.linkedFrom] : "";
+      const avail = isSimple ? [] : linkableBlocks(block);
+      const dragging = dragS.bid === block.id && dragS.i === si;
+      const over = dragOS.bid === block.id && dragOS.i === si && dragS.i !== si;
+      const g = grip("s:" + s.id);
+      return (
+        <li key={s.id} className="sab-line">
+          <div className={"sab-row" + (dragging ? " is-dragging" : "") + (over ? " is-over" : "")}
+            draggable={armed === "s:" + s.id} onDragStart={e => hdS(e, block.id, si, "s:" + s.id)} onDragOver={e => hdO(e, block.id, si)} onDragLeave={hdL} onDrop={e => hdD(e, block.id, si)} onDragEnd={hdE}>
+            <MoveButtons id={base} label={label} index={si} count={block.supports.length} onMove={(dir, which) => moveSupport(block.id, si, dir, which)} onGrip={g.onMouseDown}/>
+            {isLinked ? (
+              <>
+                <span className="sab-label" {...g}>{label}.</span>
+                <span className="sab-linked">
+                  {ArrowIcon}
+                  <span className="sab-linked-text">{st.byId[s.linkedFrom].conclusion || `[${linkedLabel}]`} <span className="sab-eq">[= {linkedLabel}]</span></span>
+                </span>
+              </>
+            ) : (
+              <>
+                <label className="sab-label" htmlFor={base} {...g}><span className="sab-sr">Support statement </span>{label}.</label>
+                <Field id={base} value={s.text} onChange={t => updateSupport(block.id, s.id, t)}
+                  onKeyDown={e => handleSupportKey(e, block, s, si)} placeholder="Enter a support statement..."/>
+              </>
+            )}
+            {block.supports.length > 1 && (
+              <button type="button" className="sab-x" aria-label={`Remove ${label}`} onClick={() => removeSupportAt(block, si)}>{XIcon}</button>
+            )}
+          </div>
+          {isLinked ? (
+            <div className="sab-links">
+              <button type="button" id={`${base}-unlink`} className="sab-unlink" aria-label={`Unlink ${linkedLabel} from ${label}`}
+                onClick={() => unlinkSupport(block.id, s)}>Unlink</button>
+            </div>
+          ) : (
+            <div className="sab-links">
+              <button type="button" className="sab-link" aria-label={`Add tributary for ${label}`} onClick={() => addTributary(block.id, s.id)}>
+                <span aria-hidden="true">+ </span>Add tributary
+              </button>
+              {avail.map(lb => (
+                <button type="button" key={lb.id} className="sab-link" aria-label={`Link ${linkName(lb.id)} into ${label}`}
+                  onClick={() => linkSupport(block.id, s.id, lb.id)}>
+                  <span aria-hidden="true">← </span>Link {linkName(lb.id)}
+                </button>
+              ))}
+            </div>
+          )}
+        </li>
+      );
+    };
+
+    const renderRule = (block, cLabel) => (
+      <div className="sab-rule">
+        <div className={"sab-rule-line" + (block.diagnostic ? " is-diagnostic" : "")} aria-hidden="true">
+          <span className="sab-rule-stroke"></span>
+          {block.diagnostic && <span className="sab-rule-d">d</span>}
+        </div>
+        <label className={"sab-check" + (block.diagnostic ? " is-on" : "")}>
+          <input type="checkbox" checked={block.diagnostic} onChange={() => toggleDiagnostic(block.id)}/>
+          Diagnostic{cLabel && <span className="sab-sr"> inference for {cLabel}</span>}
+        </label>
+      </div>
+    );
+
+    const renderPreview = () => hasContent && (
+      <div className="sab-section">
+        <div className="sab-preview-head">
+          <h2 className="sab-h2" id="sab-preview-h">Preview</h2>
+          {!isSimple && (
+            <div className="sab-seg" role="group" aria-label="Layout">
+              <button type="button" aria-pressed={layout !== "side" ? "true" : "false"} onClick={() => setLayout("stacked")}>Stacked</button>
+              <button type="button" aria-pressed={layout === "side" ? "true" : "false"} onClick={() => setLayout("side")}>Side by side</button>
+            </div>
+          )}
+        </div>
+        {!isSimple && layout === "side" && !st.chain && (
+          <p className="sab-note">Side by side works only for a single chain of arguments, so this shows the stacked layout.</p>
+        )}
+        {useSide && (
+          <p className="sab-note">Side by side needs a fixed-width font. Download keeps it as is, and Copy pastes it as Preformatted text.{sideFitsPage ? "" : " It is too wide for a printed page, so Print uses the stacked layout."}</p>
+        )}
+        {useSide ? (
+          <div className="sab-preview-box" tabIndex={0} role="region" aria-labelledby="sab-preview-h"><pre className="sab-pre">{outputText()}</pre></div>
+        ) : (
+          <div className="sab-preview-box"><pre className="sab-pre sab-pre--wrap">{outputText()}</pre></div>
+        )}
+      </div>
+    );
+
+    const liveRegion = <div className="sab-sr" role="status" aria-live="polite">{live}</div>;
+    // The Undo bar sits second in both layouts, so switching between them never remounts it.
+    const undoBar = <UndoBar entry={undo[undo.length - 1]} onUndo={doUndo}/>;
+    const actions = <ActBtns copied={copied} onCopy={handleCopy} onDownload={handleDownload} onPrint={handlePrint} onClear={handleClear} disabled={!hasContent}/>;
+    const tail = (
+      <>
+        <pre className={"sab-printout" + (sideFitsPage ? " sab-printout--pre" : "")}>{hasContent ? printText() : ""}</pre>
+      </>
+    );
+
+    // ── SIMPLE ──
+    if (isSimple) {
+      const block = blocks[0]; const filled = block.supports.filter(s => s.text.trim()).length;
+      return (
+        <>
+          {liveRegion}
+          {undoBar}
+          <p className="sab-intro">Add your support statements below and fill in the conclusion. Reorder a line with the arrows beside it, or drag it by its number. Press <strong>Enter</strong> to add a line below the current one.</p>
+          <p className="sab-status">{saveState}</p>
+          <div className="sab-section">
+            <div className="sab-section-head">
+              <h2 className="sab-h2">Support Statements</h2>
+              <span className="sab-count">{filled} statement{filled !== 1 ? "s" : ""}</span>
+            </div>
+            <ol className="sab-lines" role="list">
+              {block.supports.map((s, i) => renderSupport(block, s, i))}
+            </ol>
+            <AddBtn onClick={() => addSupport(block.id)} label="Add support"/>
+          </div>
+          {renderRule(block)}
+          <div>
+            <h2 className="sab-h2">Conclusion</h2>
+            <div className="sab-row sab-row--solo">
+              <label className="sab-label" htmlFor={`sab-c-${block.id}`}><span className="sab-sr">Conclusion </span>{st.label[block.id]}.</label>
+              <Field id={`sab-c-${block.id}`} value={block.conclusion} onChange={t => updateConclusion(block.id, t)} placeholder="Enter the conclusion..."/>
+            </div>
+          </div>
+          {renderIbeFields()}
+          {renderPreview()}
+          {actions}
+          <div className="sab-more">
+            <AddBtn id="sab-add-block" className="sab-add-block" onClick={addBlock} label="Add a separate argument"/>
+            <p className="sab-hint">For a second argument in the same passage. To support one line with its own argument, use Add tributary under that line.</p>
+          </div>
+          <p className="sab-tip">Tip: Press <strong>Enter</strong> to add a new support line. Press <strong>Backspace</strong> on an empty line to remove it.</p>
+          {tail}
+        </>
+      );
+    }
+
+    // ── COMPLEX ──
+    return (
+      <>
+        {liveRegion}
+        {undoBar}
+        <p className="sab-intro">Build your complex argument. Use <strong>Add tributary</strong> under a line to support it with its own argument, or link an existing argument into a line.</p>
+        <p className="sab-status">{saveState}</p>
+        <div className="sab-section">
+          {st.order.map(id => {
+            const block = st.byId[id];
+            const isMain = st.isMain(id) && st.mains.length === 1;
+            const cLabel = st.label[id];
+            return (
+              <React.Fragment key={id}>
+                <div className={"sab-block" + (isMain ? " sab-block--main" : "")}>
+                  <div className="sab-block-head">
+                    <h2 className="sab-h2">{headingNode(id)}</h2>
+                    <button type="button" id={`sab-rm-${id}`} className="sab-small" aria-label={`Remove ${st.name[id]}`} onClick={() => removeBlock(id)}>Remove</button>
+                  </div>
+                  <ol className="sab-lines" role="list">
+                    {block.supports.map((s, si) => renderSupport(block, s, si))}
+                  </ol>
+                  <AddBtn onClick={() => addSupport(block.id)} label="Add support"/>
+                  {renderRule(block, cLabel)}
+                  <div className="sab-row sab-row--solo">
+                    <label className="sab-label" htmlFor={`sab-c-${id}`}><span className="sab-sr">Conclusion </span>{cLabel}.</label>
+                    <Field id={`sab-c-${id}`} value={block.conclusion} onChange={t => updateConclusion(id, t)}
+                      placeholder={st.isMain(id) ? (isMain ? "Enter the main conclusion..." : "Enter this argument's conclusion...") : `Enter conclusion ${cLabel}...`}/>
+                  </div>
+                </div>
+                {st.connector[id] && <p className="sab-connector"><span aria-hidden="true">▼ </span>{st.connector[id]}</p>}
+              </React.Fragment>
+            );
+          })}
+          <AddBtn id="sab-add-block" className="sab-add-block" onClick={addBlock} label="Add a separate argument"/>
+        </div>
+        {renderIbeFields()}
+        {renderPreview()}
+        {actions}
+        <p className="sab-tip">Tip: Press <strong>Enter</strong> to add a line below the current one. Press <strong>Backspace</strong> on an empty line to remove it.</p>
+        {tail}
+      </>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
 </body>
 </html>
