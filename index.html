@@ -21,7 +21,7 @@
 <link rel="apple-touch-icon" href="https://maxwellunlimited.com/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400..700;1,8..60,400&family=Overpass+Mono:wght@400;500&family=Overpass:wght@400;500&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
@@ -42,8 +42,9 @@
     --right: #1d5c38;
     --btn-bg: #151515;
     --btn-fg: #f3f0e8;
-    --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-    --sans: "IBM Plex Sans", Arial, Helvetica, sans-serif;
+    --mono: "Overpass Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    --display: "Overpass", "Helvetica Neue", Arial, sans-serif;
+    --prose: "Source Serif 4", Georgia, "Times New Roman", serif;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -159,7 +160,7 @@
 
   .sab-title {
     margin: 0;
-    font-family: var(--sans);
+    font-family: var(--display);
     font-weight: 400;
     font-size: clamp(1.85rem, 5.4vw, 2.9rem);
     line-height: 1.04;
@@ -173,11 +174,11 @@
   .sab-intro {
     margin: 0;
     max-width: 38rem;
-    font-family: var(--sans);
+    font-family: var(--prose);
     font-size: 1.02rem;
     line-height: 1.7;
   }
-  .sab-intro strong { font-weight: 500; }
+  .sab-intro strong { font-weight: 700; }
 
   .sab-status {
     margin: 0.55rem 0 0;
@@ -271,7 +272,7 @@
     width: 0;
     min-width: 0;
     display: grid;
-    font-family: var(--sans);
+    font-family: var(--prose);
     font-size: 1rem;
     line-height: 1.4;
   }
@@ -349,7 +350,7 @@
     gap: 0.4rem;
     padding: 0.6rem 0.25rem;
     color: var(--accent);
-    font-family: var(--sans);
+    font-family: var(--prose);
     font-size: 0.95rem;
   }
   .sab-linked svg { flex: none; margin-top: 0.25rem; }
@@ -589,7 +590,7 @@
     .sab-skip, .sab-masthead, .sab-footer, .sab-undo { display: none !important; }
     #root > :not(.sab-printout) { display: none !important; }
     .sab-shell { display: block; min-height: 0; padding: 0; }
-    .sab-printout { display: block !important; margin: 0; white-space: pre-wrap; color: #000; font: 10.5pt/1.6 "IBM Plex Mono", ui-monospace, monospace; }
+    .sab-printout { display: block !important; margin: 0; white-space: pre-wrap; color: #000; font: 10.5pt/1.6 "Overpass Mono", ui-monospace, monospace; }
     .sab-printout--pre { white-space: pre !important; }
   }
 
@@ -637,8 +638,8 @@
 <a class="sab-skip" href="#main">Skip to content</a>
 <div class="sab-shell">
   <header class="sab-masthead">
-    <a class="sab-homelink" id="sab-homelink" href="https://maxwellunlimited.com/workshop.html">← Maxwell Unlimited // Workshop</a>
-    <p class="sab-eyebrow">Argument structure · MU-W-010</p>
+    <a class="sab-homelink" id="sab-homelink" href="https://maxwellunlimited.com/workshop.html">← Workshop</a>
+    <p class="sab-eyebrow">Argument structure · MU-W-010 · Live</p>
     <h1 class="sab-title">Schematized Argument Builder</h1>
   </header>
 
@@ -648,8 +649,8 @@
   </main>
 
   <footer class="sab-footer">
-    <span>MU // Workshop</span>
-    <a href="https://airtable.com/appxdI0VPvkKlM8u1/pag4PguwP8nUxPA3p/form" target="_blank" rel="noopener">Send feedback<span class="sab-sr"> (opens in a new tab)</span> <span aria-hidden="true">↗</span></a>
+    <span>No sign-in · Your draft stays in your browser</span>
+    <a id="sab-feedback" href="https://airtable.com/appxdI0VPvkKlM8u1/pag4PguwP8nUxPA3p/form" target="_blank" rel="noopener">Send feedback<span class="sab-sr"> (opens in a new tab)</span> <span aria-hidden="true">↗</span></a>
   </footer>
 </div>
 
@@ -663,6 +664,22 @@
     link.target = "_blank";
     link.rel = "noopener";
     link.insertAdjacentHTML("beforeend", '<span class="sab-sr"> (opens in a new tab)</span>');
+  })();
+
+  /* Feedback goes to one short form shared by the Workshop tools. The link arrives filled in
+     (prefill_ in the URL) with the tool and the student's current draft as plain text. */
+  (function () {
+    var form = "https://airtable.com/appxdI0VPvkKlM8u1/pag4PguwP8nUxPA3p/form";
+    var aim = function () {
+      var a = document.getElementById("sab-feedback"), out = document.querySelector(".sab-printout");
+      var work = out ? out.textContent.trim().slice(0, 4000) : "";
+      a.href = form + "?prefill_Tool=" + encodeURIComponent("Schematized Argument Builder") + "&hide_Tool=true"
+        + "&hide_Item=true&hide_Student%20work=true&hide_Ease%20of%20Use=true&hide_Helped%20Learning=true&hide_Suggestions=true"
+        + (work ? "&prefill_Student+work=" + encodeURIComponent(work) : "");
+    };
+    ["mouseover", "focusin", "click", "contextmenu"].forEach(function (ev) {
+      document.addEventListener(ev, function (e) { if (e.target.closest && e.target.closest("#sab-feedback")) aim(); }, true);
+    });
   })();
 </script>
 
